@@ -1,0 +1,50 @@
+@startuml secuencia_04_wordpress_ranking
+!theme plain
+title Secuencia 04 — Ranking público consumido por WordPress (RF11, RF12, RNF002)
+
+actor "Visitante" as visitante
+participant "Página WordPress" as pagina
+participant "Plugin\n[ranking_table]" as plugin
+database "Transients\n(caché WP)" as transients
+participant "public_api.routes\n(Flask)" as api
+participant "PublicRankingService" as service
+participant "Caché memoria\n(TTL)" as cache
+database "SQLite" as db
+
+visitante -> pagina : Abre página de ranking
+pagina -> plugin : Renderiza shortcode
+plugin -> transients : get_transient('ranking_table')
+
+alt caché WordPress válida (TTL ~5 min)
+  transients --> plugin : HTML cacheado
+  plugin --> pagina : tabla HTML
+else caché expirada o inexistente
+  plugin -> api : HTTPS GET /api/ranking
+  api -> service : get_ranking(community_id)
+  service -> cache : consultar caché en memoria
+  alt caché backend válida
+    cache --> service : lista
+  else caché inválida
+    service -> db : SELECT ratings ORDER BY elo DESC
+    db --> service : filas
+    service -> cache : guardar (TTL)
+  end
+  service --> api : List<RankingEntryDTO>
+  api --> plugin : 200 OK JSON\n(posición, nombre, Elo, n.º combates)
+  plugin -> transients : set_transient(html, TTL)
+  plugin --> pagina : tabla HTML
+end
+pagina --> visitante : Ranking visible
+
+alt endpoint no responde / timeout
+  plugin -> transients : usa última caché aunque expirada
+  plugin --> pagina : tabla (desactualizada pero disponible)
+end
+
+note right of api
+  <500 ms con 100 usuarios (RNF002).
+  Sin autenticación; cabecera preparada
+  para API key futura.
+end note
+
+@enduml

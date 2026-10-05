@@ -1,0 +1,39 @@
+%% Secuencia 02 — Reporte offline y sincronización (RF5 simplificado, RF14)
+sequenceDiagram
+    autonumber
+    actor J as Jugador
+    participant V as Vista PWA
+    participant IDB as IndexedDB<br/>(outbox)
+    participant SW as Service Worker<br/>(sw.js)
+    participant R as combat.routes
+    participant S as CombatService
+    participant DB as SQLite
+
+    J->>V: Reporta combate SIN conexión
+    V->>V: Detecta navigator.onLine == false
+    V->>IDB: Encola reporte<br/>(clave_idempotencia = UUID local)
+    IDB-->>V: encolado
+    V-->>J: Guardado offline. Se enviará al recuperar red.
+
+    Note over SW: Tiempo después: vuelve la conectividad
+    SW->>SW: Evento 'online'
+    SW->>IDB: Lee reportes pendientes (FIFO)
+    loop por cada reporte pendiente
+        SW->>R: POST /api/combats<br/>(cabecera Idempotency-Key)
+        R->>S: register_combat(dto)
+        S->>DB: Busca combate con misma clave
+        alt duplicado (clave ya procesada)
+            DB-->>S: ya existe
+            S-->>R: 200 OK (descartado, idempotente)
+        else nuevo
+            S->>DB: INSERT (estado = PENDIENTE)
+            S-->>R: 201 Created
+        end
+        R-->>SW: respuesta
+        SW->>IDB: Elimina reporte de la cola
+        alt error de red durante el envío
+            SW->>SW: Reintento con backoff exponencial
+        end
+    end
+    SW->>V: Refresca caché (ranking, historial)
+    SW-->>J: Notificación: Sincronización completa

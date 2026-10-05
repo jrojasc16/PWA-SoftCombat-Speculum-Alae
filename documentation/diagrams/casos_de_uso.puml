@@ -1,0 +1,70 @@
+@startuml casos_de_uso
+!theme plain
+left to right direction
+title Casos de uso — PWA Ranking Elo Speculum-Alae (MVP)
+
+actor "Jugador" as jugador
+actor "Árbitro" as arbitro
+actor "Administrador" as admin
+actor "Super Administrador" as superadmin
+actor "Visitante público" as visitante
+actor "WordPress\n(plugin)" as wordpress
+
+arbitro --|> jugador
+superadmin --|> admin
+
+rectangle "Sistema PWA Speculum-Alae (Flask)" {
+
+  ' --- Cuenta e información ---
+  usecase "UC1 Registrarse" as uc1
+  usecase "UC2 Iniciar sesión" as uc2
+  usecase "UC3 Ver ranking general" as uc3
+  usecase "UC4 Consultar historial propio" as uc4
+  usecase "UC5 Ver perfil de otro jugador" as uc5
+
+  ' --- Combates ---
+  usecase "UC6 Reportar combate\n(online u offline)" as uc6
+  usecase "UC7 Sincronizar reportes\nencolados (outbox)" as uc7
+  usecase "UC8 Confirmar combate\n(participante)" as uc8
+  usecase "UC9 Confirmar combate\nprioridad árbitro" as uc9
+
+  ' --- Administración (panel web) ---
+  usecase "UC10 Gestionar usuarios\n(suspender/editar)" as uc10
+  usecase "UC11 Asignar rol\n(jugador/árbitro/admin)" as uc11
+  usecase "UC12 Editar resultado\nmanualmente (auditado)" as uc12
+  usecase "UC13 Recálculo manual\ndel ranking" as uc13
+  usecase "UC14 Configurar parámetros\ndel sistema" as uc14
+
+  ' --- Público ---
+  usecase "UC15 Consultar ranking público\nGET /api/ranking" as uc15
+
+  ' --- Sistema ---
+  usecase "UC16 Recalcular Elo on-write\ntras confirmación" as uc16
+}
+
+jugador --> uc1
+jugador --> uc2
+jugador --> uc3
+jugador --> uc4
+jugador --> uc5
+jugador --> uc6
+jugador --> uc7
+jugador --> uc8
+arbitro --> uc9
+uc9 ..|> uc8 : <<extend>>\n(prioridad sobre jugadores)
+
+admin --> uc2
+admin --> uc10
+admin --> uc11
+admin --> uc12
+admin --> uc13
+superadmin --> uc14
+
+visitante --> uc15
+wordpress --> uc15
+uc6 ..> uc16 : <<include>>\n(al confirmarse)
+uc9 ..> uc16 : <<include>>
+uc12 ..> uc16 : <<include>>
+uc13 ..> uc16 : <<include>>
+
+@enduml

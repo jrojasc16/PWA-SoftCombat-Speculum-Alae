@@ -1,0 +1,28 @@
+%% Secuencia 01 — Reporte de combate online (RF6)
+sequenceDiagram
+    autonumber
+    actor J as Jugador
+    participant V as Vista PWA<br/>(JS vanilla)
+    participant R as combat.routes<br/>(Blueprint)
+    participant S as CombatService
+    participant RE as CombatRepository
+    participant DB as SQLite
+
+    J->>V: Diligencia formulario (fecha, modalidad, participantes, puntaje)
+    V->>V: Validación de campos obligatorios
+    V->>R: POST /api/combats (JSON)
+    R->>R: Verificar sesión (Flask-Login)
+    alt sesión inválida
+        R-->>V: 401 Unauthorized
+        V-->>J: Redirige a login
+    else sesión válida
+        R->>S: register_combat(dto)
+        S->>S: Validar reglas de dominio<br/>(participantes existen, puntaje válido)
+        S->>RE: save(combat, participants)
+        RE->>DB: INSERT combats, combat_participants<br/>(estado = PENDIENTE)
+        DB-->>RE: ok
+        RE-->>S: combat (id)
+        S-->>R: combat creado
+        R-->>V: 201 Created
+        V-->>J: Combate reportado. Pendiente de confirmación
+    end

@@ -1,0 +1,58 @@
+%% Diagrama de paquetes — Arquitectura del sistema
+%% (Mermaid no tiene diagrama de paquetes nativo; se aproxima con flowchart + subgraphs)
+flowchart TB
+
+    subgraph APP["app"]
+        subgraph MODULES["modules"]
+            subgraph IAM["iam"]
+                IAM_R["routes"] --> IAM_S["services"] --> IAM_RE["repositories"] --> IAM_M["models"]
+            end
+            subgraph COMBAT["combat"]
+                COM_R["routes"] --> COM_S["services"] --> COM_RE["repositories"] --> COM_M["models"]
+            end
+            subgraph RANKING["ranking"]
+                ELO["domain.elo<br/>(puro, sin dependencias)"]
+                RAN_S["services"] --> RAN_RE["repositories"] --> RAN_M["models"]
+                RAN_S --> ELO
+            end
+            subgraph HISTORY["history"]
+                HIS_R["routes"] --> HIS_S["services"] --> HIS_RE["repositories"]
+            end
+            subgraph PUBLIC["public_api"]
+                PUB_R["routes"] --> PUB_S["services"] --> PUB_D["dto"]
+            end
+        end
+
+        subgraph SHARED["shared"]
+            CONST["constants<br/>(k, percentiles, reglamento)"]
+            DECO["decorators<br/>(@role_required)"]
+        end
+
+        TEMPL["templates (Jinja2)"]
+        subgraph STATIC["static (PWA)"]
+            JS["vistas JS vanilla"]
+            SW["sw.js<br/>(service worker)"]
+            IDB["db.js<br/>(outbox IndexedDB)"]
+        end
+    end
+
+    subgraph EXT["extensions"]
+        DB["SQLAlchemy (db)"]
+        LOGIN["Flask-Login"]
+        MIG["Flask-Migrate"]
+    end
+
+    TESTS["tests (pytest)"]
+    WP["wordpress-integration<br/>plugin PHP — shortcode [ranking_table]"]
+
+    COM_S -->|confirmación dispara recálculo| RAN_S
+    RAN_S --> CONST
+    IAM_S --> LOGIN
+    IAM_RE & COM_RE & RAN_RE & HIS_RE --> DB
+    IAM_R & COM_R --> DECO
+    PUB_S --> RAN_RE
+
+    JS -->|fetch mismo origen| IAM_R & COM_R & HIS_R
+    SW -->|reintenta cola| IDB
+    WP -->|HTTPS GET /api/ranking| PUB_R
+    TESTS -->|cobertura ≥70%| ELO

@@ -1,0 +1,91 @@
+@startuml paquetes
+!theme plain
+title Diagrama de paquetes — Arquitectura del sistema
+
+package "app" {
+
+  package "modules" {
+    package "iam" {
+      [routes] as iam_routes
+      [services] as iam_services
+      [repositories] as iam_repos
+      [models] as iam_models
+    }
+    package "combat" {
+      [routes] as combat_routes
+      [services] as combat_services
+      [repositories] as combat_repos
+      [models] as combat_models
+    }
+    package "ranking" {
+      [domain.elo\n(puro, sin dependencias)] as elo
+      [services] as ranking_services
+      [repositories] as ranking_repos
+      [models] as ranking_models
+    }
+    package "history" {
+      [routes] as history_routes
+      [services] as history_services
+      [repositories] as history_repos
+    }
+    package "public_api" {
+      [routes] as public_routes
+      [services] as public_services
+      [dto] as public_dto
+    }
+  }
+
+  package "shared" {
+    [constants\n(k, percentiles, reglamento)] as constants
+    [decorators\n(@role_required)] as decorators
+    [errors] as errors
+  }
+
+  package "templates (Jinja2)" as templates
+  package "static (PWA)" {
+    [vistas JS vanilla] as js
+    [sw.js\n(service worker)] as sw
+    [db.js\n(outbox IndexedDB)] as idb
+    [manifest.json] as manifest
+  }
+}
+
+package "extensions" {
+  [SQLAlchemy (db)] as db
+  [Flask-Login] as login
+  [Flask-Migrate] as migrate
+}
+
+package "tests (pytest)" as tests
+package "wordpress-integration" {
+  [plugin PHP\nshortcode [ranking_table]] as wp_plugin
+}
+
+iam_services --> iam_repos
+combat_services --> combat_repos
+combat_services --> ranking_services : confirmación dispara recálculo
+ranking_services --> elo
+ranking_services --> ranking_repos
+public_services --> ranking_repos
+history_services --> history_repos
+
+iam_repos --> db
+combat_repos --> db
+ranking_repos --> db
+history_repos --> db
+
+iam_services --> login
+ranking_services --> constants
+iam_routes --> decorators
+combat_routes --> decorators
+
+js --> iam_routes : fetch (mismo origen)
+js --> combat_routes
+js --> history_routes
+sw --> idb : reintenta cola
+wp_plugin --> public_routes : HTTPS GET /api/ranking
+
+tests --> elo : cobertura >= 70%
+tests --> combat_services
+
+@enduml

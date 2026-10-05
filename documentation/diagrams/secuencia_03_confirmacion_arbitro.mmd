@@ -1,0 +1,39 @@
+%% Secuencia 03 — Confirmación, prioridad de árbitro y recálculo on-write (RF7, RF8, RF9, RNF008)
+sequenceDiagram
+    autonumber
+    actor O as Oponente
+    actor A as Árbitro
+    participant R as combat.routes
+    participant CS as CombatService
+    participant RS as RankingService
+    participant ELO as EloCalculator<br/>(puro)
+    participant DB as SQLite
+
+    O->>R: POST /api/combats/{id}/confirm<br/>(resultado_reportado)
+    R->>CS: confirm(combat, oponente)
+    alt resultado reportado == resultado original
+        CS->>DB: UPDATE combats SET status=CONFIRMADO, processed=true
+        Note right of CS: Transacción única (Unit of Work):<br/>confirmación + recálculo Elo atómicos
+        CS->>RS: recalculate_on_confirm(combat)
+        RS->>ELO: new_rating(...) con k según<br/>combates y percentil (reglamento)
+        ELO-->>RS: nuevos Elo
+        RS->>DB: UPDATE ratings + INSERT rating_history
+        RS->>RS: Invalidar caché de /api/ranking
+        CS-->>R: 200 OK (CONFIRMADO)
+    else resultados en conflicto
+        CS->>DB: UPDATE combats SET status=CONFLICTO
+        CS-->>R: 202 Accepted (CONFLICTO)
+        R-->>O: En disputa: esperando árbitro o admin
+    end
+
+    Note over A: Si el combate tenía árbitro asignado
+    A->>R: POST /api/combats/{id}/confirm<br/>(versión del árbitro)
+    R->>CS: resolve_conflict_by_referee(combat)
+    CS->>CS: Regla de dominio: la versión del árbitro<br/>prevalece sobre los jugadores
+    CS->>DB: UPDATE combats SET status=RESUELTO, processed=true
+    CS->>RS: recalculate_on_confirm(combat)
+    RS->>ELO: new_rating(...)
+    RS->>DB: UPDATE ratings + INSERT rating_history
+    CS-->>R: 200 OK (RESUELTO)
+
+    Note over CS,DB: Idempotencia: un combate con processed=true nunca se reprocesa.<br/>La edición manual del admin (con AuditLog) usa el mismo flujo.

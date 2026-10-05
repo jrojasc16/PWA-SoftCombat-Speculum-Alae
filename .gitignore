@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+instance/
+*.db
+.env
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Documentos de trabajo internos (no versionar; sustento local)
+documentation/PLAN_DESARROLLO_PROTOTIPO.md
+documentation/PROPUESTA_NUEVO_STACK.md
+
+# IA
+AGENTS.md
+.~lock.*#

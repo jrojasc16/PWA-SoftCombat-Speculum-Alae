@@ -1,0 +1,41 @@
+%% Casos de uso — PWA Ranking Elo Speculum-Alae (MVP)
+%% Nota: Mermaid no tiene diagrama de casos de uso nativo;
+%% se aproxima con flowchart (actores = rectángulos, casos = estadios).
+flowchart LR
+    J["👤 Jugador"]
+    A["👤 Árbitro"]
+    AD["👤 Administrador"]
+    SA["👤 Super Administrador"]
+    V["👤 Visitante público"]
+    W["⚙️ WordPress (plugin)"]
+
+    A -.->|hereda de| J
+    SA -.->|hereda de| AD
+
+    subgraph S["Sistema PWA Speculum-Alae (Flask)"]
+        UC1(["UC1 Registrarse"])
+        UC2(["UC2 Iniciar sesión"])
+        UC3(["UC3 Ver ranking general"])
+        UC4(["UC4 Consultar historial propio"])
+        UC5(["UC5 Ver perfil de otro jugador"])
+        UC6(["UC6 Reportar combate (online u offline)"])
+        UC7(["UC7 Sincronizar reportes encolados (outbox)"])
+        UC8(["UC8 Confirmar combate (participante)"])
+        UC9(["UC9 Confirmar combate — prioridad árbitro"])
+        UC10(["UC10 Gestionar usuarios"])
+        UC11(["UC11 Asignar rol"])
+        UC12(["UC12 Editar resultado manualmente (auditado)"])
+        UC13(["UC13 Recálculo manual del ranking"])
+        UC14(["UC14 Configurar parámetros del sistema"])
+        UC15(["UC15 Consultar ranking público GET /api/ranking"])
+        UC16[["UC16 Recalcular Elo on-write tras confirmación"]]
+    end
+
+    J --> UC1 & UC2 & UC3 & UC4 & UC5 & UC6 & UC7 & UC8
+    A --> UC9
+    UC9 -.->|«extend» prioridad sobre jugadores| UC8
+    AD --> UC2 & UC10 & UC11 & UC12 & UC13
+    SA --> UC14
+    V --> UC15
+    W --> UC15
+    UC6 & UC9 & UC12 & UC13 -.->|«include»| UC16

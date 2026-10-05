@@ -1,0 +1,139 @@
+@startuml clases
+!theme plain
+title Diagrama de clases — Monolito modular Flask (MVP)
+
+package "modules.iam" {
+  class User {
+    +id: int
+    +community_id: int
+    +username: str (único)
+    +email: str (único)
+    +password_hash: str (bcrypt costo 12)
+    +active: bool
+    +created_at: datetime
+  }
+  class Role {
+    +id: int
+    +name: str  ' jugador | arbitro | admin | super_admin
+    +permissions: JSON  ' preparado para roles dinámicos
+  }
+  class AuthService {
+    +register(username, email, password)
+    +authenticate(username, password)
+    +change_password(user, new_password)
+  }
+  class UserRepository
+}
+
+package "modules.combat" {
+  class Combat <<aggregate root>> {
+    +id: int
+    +community_id: int
+    +date: date
+    +modality: enum  ' individual | grupal
+    +event_type: str ' solo grupal
+    +referee_id: int (opcional)
+    +status: enum  ' PENDIENTE | CONFIRMADO | CONFLICTO | RESUELTO
+    +processed: bool ' idempotencia Elo
+    +created_by: int
+  }
+  class CombatParticipant {
+    +id: int
+    +side: str        ' bando / equipo
+    +score: int       ' individual: 1 o 2 por zonas
+    +result: enum     ' victoria | derrota (grupal)
+  }
+  class Confirmation {
+    +id: int
+    +reported_result: JSON
+    +created_at: datetime
+  }
+  class AuditLog {
+    +id: int
+    +admin_id: int
+    +old_value: JSON
+    +new_value: JSON
+    +created_at: datetime
+  }
+  class CombatService {
+    +register_combat(dto)
+    +confirm(combat, by_user)
+    +resolve_conflict_by_referee(combat)
+    +admin_edit_result(combat, new_result, admin)  ' escribe AuditLog
+  }
+  class CombatRepository
+}
+
+package "modules.ranking" {
+  class EloCalculator <<domain service, puro>> {
+    +k_for(num_combats: int, percentile: float): float
+    +expected(ra: float, rb: float): float
+    +new_rating(r: float, score: float, expected: float, k: float): float
+  }
+  note right of EloCalculator
+    Sin dependencias externas (ni Flask ni SQLAlchemy).
+    Constantes k y percentiles según reglamento
+    nacional SoftCombat 2021, págs. 13-15.
+    Cobertura de tests >= 70%.
+  end note
+  class Rating {
+    +user_id: int
+    +community_id: int
+    +elo: float
+    +num_combats: int
+    +position: int
+    +updated_at: datetime
+  }
+  class RatingHistory {
+    +user_id: int
+    +combat_id: int
+    +elo_before: float
+    +elo_after: float
+    +created_at: datetime
+  }
+  class RankingService {
+    +recalculate_on_confirm(combat)  ' misma transacción que la confirmación
+    +recalculate_all(community_id)  ' botón admin; reconstruye desde historial
+  }
+  class RatingRepository
+}
+
+package "modules.history" {
+  class HistoryService {
+    +history_for(user_id, filters, page): Page
+  }
+  class HistoryRepository
+}
+
+package "modules.public_api" {
+  class RankingEntryDTO {
+    +position: int
+    +username: str
+    +elo: float
+    +num_combats: int
+  }
+  class PublicRankingService {
+    +get_ranking(community_id): List<RankingEntryDTO>  ' caché en memoria, TTL
+  }
+}
+
+User "N" --> "1" Role
+Combat "1" *-- "N" CombatParticipant
+Combat "1" *-- "N" Confirmation
+CombatParticipant "N" --> "1" User
+Confirmation "N" --> "1" User
+Combat --> User : referee (opcional)
+AuditLog --> Combat
+Rating --> User
+RatingHistory --> User
+RatingHistory --> Combat
+
+CombatService ..> CombatRepository
+CombatService ..> RankingService : notifica confirmación
+RankingService ..> EloCalculator
+RankingService ..> RatingRepository
+HistoryService ..> HistoryRepository
+PublicRankingService ..> RatingRepository
+AuthService ..> UserRepository
+
+@enduml

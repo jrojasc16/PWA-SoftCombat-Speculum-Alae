@@ -1,0 +1,27 @@
+%% Diagrama de despliegue — Prototipo (MVP)
+%% (Mermaid no tiene diagrama de despliegue nativo; se aproxima con flowchart + subgraphs)
+flowchart TB
+
+    subgraph BROWSER["Navegador del jugador (PC / móvil)"]
+        PWA["PWA (HTML/CSS/JS vanilla)"]
+        IDB[("IndexedDB<br/>(outbox + caché)")]
+        PWA --- IDB
+    end
+
+    subgraph PA["PythonAnywhere — usuario.pythonanywhere.com (HTTPS incluido)"]
+        subgraph FLASK["Flask (Python 3.11+)"]
+            APPART["app (monolito modular)"]
+            TPL["templates Jinja2 + static/"]
+        end
+        SQLITE[("SQLite<br/>app.db, modo WAL")]
+        FLASK --> SQLITE
+    end
+
+    subgraph WP["Servidor WordPress del cliente (PHP 8+)"]
+        PLUGIN["Plugin [ranking_table]<br/>(HTTP API + Transients)"]
+        WPDB[("MySQL (WordPress)")]
+        PLUGIN -->|transients (caché)| WPDB
+    end
+
+    PWA -->|HTTPS (mismo origen)| FLASK
+    PLUGIN -->|HTTPS GET /api/ranking| FLASK

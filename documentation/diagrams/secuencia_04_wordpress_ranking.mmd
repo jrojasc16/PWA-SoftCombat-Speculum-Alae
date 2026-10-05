@@ -1,0 +1,42 @@
+%% Secuencia 04 — Ranking público consumido por WordPress (RF11, RF12, RNF002)
+sequenceDiagram
+    autonumber
+    actor V as Visitante
+    participant P as Página WordPress
+    participant PL as Plugin<br/>[ranking_table]
+    participant T as Transients<br/>(caché WP)
+    participant API as public_api.routes<br/>(Flask)
+    participant S as PublicRankingService
+    participant C as Caché memoria<br/>(TTL)
+    participant DB as SQLite
+
+    V->>P: Abre página de ranking
+    P->>PL: Renderiza shortcode
+    PL->>T: get_transient('ranking_table')
+    alt caché WordPress válida (TTL ~5 min)
+        T-->>PL: HTML cacheado
+        PL-->>P: tabla HTML
+    else caché expirada o inexistente
+        PL->>API: HTTPS GET /api/ranking
+        API->>S: get_ranking(community_id)
+        S->>C: consultar caché en memoria
+        alt caché backend válida
+            C-->>S: lista
+        else caché inválida
+            S->>DB: SELECT ratings ORDER BY elo DESC
+            DB-->>S: filas
+            S->>C: guardar (TTL)
+        end
+        S-->>API: List~RankingEntryDTO~
+        API-->>PL: 200 OK JSON<br/>(posición, nombre, Elo, n.º combates)
+        PL->>T: set_transient(html, TTL)
+        PL-->>P: tabla HTML
+    end
+    P-->>V: Ranking visible
+
+    alt endpoint no responde / timeout
+        PL->>T: usa última caché aunque expirada
+        PL-->>P: tabla (desactualizada pero disponible)
+    end
+
+    Note over API: menor de 500 ms con 100 usuarios (RNF002).<br/>Sin autenticación; cabecera lista para API key futura.

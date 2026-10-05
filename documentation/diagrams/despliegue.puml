@@ -1,0 +1,36 @@
+@startuml despliegue
+!theme plain
+title Diagrama de despliegue — Prototipo (MVP)
+
+node "Navegador del jugador\n(PC / móvil)" as browser {
+  artifact "PWA (HTML/CSS/JS vanilla)" as pwa
+  database "IndexedDB\n(outbox + caché)" as idb
+}
+pwa ..> idb
+
+node "PythonAnywhere\n(usuario.pythonanywhere.com, HTTPS incluido)" as pa {
+  node "Flask (Python 3.11+)" as flask {
+    artifact "app (monolito modular)"
+    artifact "templates Jinja2 + static/"
+  }
+  database "SQLite\n(app.db, modo WAL)" as sqlite
+}
+flask --> sqlite
+
+node "Servidor WordPress del cliente\n(PHP 8+)" as wp {
+  artifact "Plugin [ranking_table]\n(HTTP API + Transients)" as plugin
+  database "MySQL (WordPress)" as wpdb
+}
+plugin --> wpdb : transients (caché)
+
+pwa --> flask : HTTPS (mismo origen)
+plugin --> flask : HTTPS GET /api/ranking
+
+note bottom of pa
+  Plan gratuito: aceptable para el prototipo.
+  Producción: el cliente decide plan pago
+  o migración a otro hosting con Python 3.11+.
+  Migración BD futura: SQLite -> MySQL/PostgreSQL vía SQLAlchemy.
+end note
+
+@enduml

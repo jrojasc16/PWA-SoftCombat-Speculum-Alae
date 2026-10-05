@@ -1,0 +1,47 @@
+@startuml secuencia_03_confirmacion_arbitro
+!theme plain
+title Secuencia 03 — Confirmación, prioridad de árbitro y recálculo on-write (RF7, RF8, RF9, RNF008)
+
+actor "Oponente" as oponente
+actor "Árbitro" as arbitro
+participant "combat.routes" as routes
+participant "CombatService" as combat_svc
+participant "RankingService" as ranking_svc
+participant "EloCalculator\n(puro)" as elo
+database "SQLite" as db
+
+oponente -> routes : POST /api/combats/{id}/confirm\n(resultado_reportado)
+routes -> combat_svc : confirm(combat, oponente)
+
+alt resultado reportado == resultado original
+  combat_svc -> db : UPDATE combats SET status = CONFIRMADO, processed = true
+  note right : Transacción única (Unit of Work):\nconfirmación + recálculo Elo atómicos
+  combat_svc -> ranking_svc : recalculate_on_confirm(combat)
+  ranking_svc -> elo : new_rating(...) con k según\ncombates y percentil (reglamento)
+  elo --> ranking_svc : nuevos Elo
+  ranking_svc -> db : UPDATE ratings + INSERT rating_history
+  ranking_svc -> ranking_svc : Invalidar caché de /api/ranking
+  combat_svc --> routes : 200 OK (CONFIRMADO)
+else resultados en conflicto
+  combat_svc -> db : UPDATE combats SET status = CONFLICTO
+  combat_svc --> routes : 202 Accepted (CONFLICTO)
+  routes --> oponente : "En disputa: esperando árbitro o admin"
+end
+
+... Si el combate tenía árbitro asignado ...
+arbitro -> routes : POST /api/combats/{id}/confirm\n(versión del árbitro)
+routes -> combat_svc : resolve_conflict_by_referee(combat)
+combat_svc -> combat_svc : Regla de dominio: la versión del\nárbitro prevalece sobre los jugadores
+combat_svc -> db : UPDATE combats SET status = RESUELTO, processed = true
+combat_svc -> ranking_svc : recalculate_on_confirm(combat)
+ranking_svc -> elo : new_rating(...)
+ranking_svc -> db : UPDATE ratings + INSERT rating_history
+combat_svc --> routes : 200 OK (RESUELTO)
+
+note over combat_svc, db
+  Idempotencia: un combate con processed = true
+  nunca se reprocesa. La edición manual del admin
+  (con AuditLog) usa el mismo flujo de recálculo.
+end note
+
+@enduml

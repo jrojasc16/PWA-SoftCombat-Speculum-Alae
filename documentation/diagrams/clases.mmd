@@ -1,0 +1,132 @@
+%% Diagrama de clases — Monolito modular Flask (MVP)
+classDiagram
+
+namespace modules_iam {
+    class User {
+        +int id
+        +int community_id
+        +str username
+        +str email
+        +str password_hash
+        +bool active
+        +datetime created_at
+    }
+    class Role {
+        +int id
+        +str name
+        +JSON permissions
+    }
+    class AuthService {
+        +register(username, email, password)
+        +authenticate(username, password)
+        +change_password(user, new_password)
+    }
+    class UserRepository
+}
+
+namespace modules_combat {
+    class Combat {
+        <<aggregate root>>
+        +int id
+        +int community_id
+        +date date
+        +enum modality
+        +str event_type
+        +int referee_id
+        +enum status
+        +bool processed
+        +int created_by
+    }
+    class CombatParticipant {
+        +int id
+        +str side
+        +int score
+        +enum result
+    }
+    class Confirmation {
+        +int id
+        +JSON reported_result
+        +datetime created_at
+    }
+    class AuditLog {
+        +int id
+        +int admin_id
+        +JSON old_value
+        +JSON new_value
+        +datetime created_at
+    }
+    class CombatService {
+        +register_combat(dto)
+        +confirm(combat, by_user)
+        +resolve_conflict_by_referee(combat)
+        +admin_edit_result(combat, new_result, admin)
+    }
+    class CombatRepository
+}
+
+namespace modules_ranking {
+    class EloCalculator {
+        <<domain service puro>>
+        +k_for(num_combats, percentile) float
+        +expected(ra, rb) float
+        +new_rating(r, score, expected, k) float
+    }
+    class Rating {
+        +int user_id
+        +int community_id
+        +float elo
+        +int num_combats
+        +int position
+        +datetime updated_at
+    }
+    class RatingHistory {
+        +int user_id
+        +int combat_id
+        +float elo_before
+        +float elo_after
+        +datetime created_at
+    }
+    class RankingService {
+        +recalculate_on_confirm(combat)
+        +recalculate_all(community_id)
+    }
+    class RatingRepository
+}
+
+namespace modules_history {
+    class HistoryService {
+        +history_for(user_id, filters, page) Page
+    }
+    class HistoryRepository
+}
+
+namespace modules_public_api {
+    class RankingEntryDTO {
+        +int position
+        +str username
+        +float elo
+        +int num_combats
+    }
+    class PublicRankingService {
+        +get_ranking(community_id) List~RankingEntryDTO~
+    }
+}
+
+User "N" --> "1" Role
+Combat "1" *-- "N" CombatParticipant
+Combat "1" *-- "N" Confirmation
+CombatParticipant "N" --> "1" User
+Confirmation "N" --> "1" User
+Combat --> User : referee opcional
+AuditLog --> Combat
+Rating --> User
+RatingHistory --> User
+RatingHistory --> Combat
+
+CombatService ..> CombatRepository
+CombatService ..> RankingService : notifica confirmación
+RankingService ..> EloCalculator
+RankingService ..> RatingRepository
+HistoryService ..> HistoryRepository
+PublicRankingService ..> RatingRepository
+AuthService ..> UserRepository

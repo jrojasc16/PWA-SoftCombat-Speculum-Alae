@@ -1,0 +1,33 @@
+%% EDT — PWA Ranking Elo Speculum-Alae (MVP)
+mindmap
+  root((PWA Ranking Elo<br/>Speculum-Alae))
+    1. Gestión del proyecto
+      1.1 Documento de metodología (reescritura)
+      1.2 Backlog y seguimiento de sprints
+      1.3 Control de versiones
+    2. Backend (Flask)
+      2.1 Setup base (App Factory, SQLAlchemy, migraciones)
+      2.2 IAM (registro, login sesiones, roles fijos)
+      2.3 Núcleo Elo puro (reglamento, ≥70% tests)
+      2.4 Combates (registro, confirmación, prioridad árbitro)
+      2.5 Edición manual admin + auditoría
+      2.6 Recálculo on-write + endpoint público /api/ranking
+      2.7 Historial de partidas
+    3. PWA (frontend)
+      3.1 Vistas (Jinja2 + JS vanilla + CSS responsive)
+      3.2 Manifest + service worker (lectura offline)
+      3.3 Outbox IndexedDB (reportes offline + sync)
+    4. Integración WordPress
+      4.1 Plugin PHP + shortcode [ranking_table]
+      4.2 Caché con Transients
+    5. Calidad
+      5.1 Tests unitarios e integración (pytest)
+      5.2 Prueba de carga (100 usuarios, menor 500 ms)
+      5.3 Documentación OpenAPI
+    6. Documentación técnica
+      6.1 Manual de despliegue
+      6.2 Manual de usuario
+      6.3 Diagramas UML (PlantUML/Mermaid a PNG)
+    7. Despliegue
+      7.1 Producción en PythonAnywhere
+      7.2 Monitoreo inicial y contingencia

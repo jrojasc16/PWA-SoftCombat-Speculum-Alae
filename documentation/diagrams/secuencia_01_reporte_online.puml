@@ -1,0 +1,31 @@
+@startuml secuencia_01_reporte_online
+!theme plain
+title Secuencia 01 — Reporte de combate online (RF6)
+
+actor "Jugador" as jugador
+participant "Vista PWA\n(JS vanilla)" as vista
+participant "combat.routes\n(Blueprint)" as routes
+participant "CombatService" as service
+participant "CombatRepository" as repo
+database "SQLite" as db
+
+jugador -> vista : Diligencia formulario de combate\n(fecha, modalidad, participantes, puntaje)
+vista -> vista : Validación de campos obligatorios
+vista -> routes : POST /api/combats (JSON)
+routes -> routes : Verificar sesión (Flask-Login)
+alt sesión inválida
+  routes --> vista : 401 Unauthorized
+  vista --> jugador : Redirige a login
+else sesión válida
+  routes -> service : register_combat(dto)
+  service -> service : Validar reglas de dominio\n(participantes existen, puntaje válido)
+  service -> repo : save(combat, participants)
+  repo -> db : INSERT combats, combat_participants\n(estado = PENDIENTE)
+  db --> repo : ok
+  repo --> service : combat (id)
+  service --> routes : combat creado
+  routes --> vista : 201 Created
+  vista --> jugador : "Combate reportado.\nPendiente de confirmación"
+end
+
+@enduml

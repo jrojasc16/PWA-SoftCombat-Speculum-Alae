@@ -1,0 +1,42 @@
+@startuml secuencia_02_offline_sync
+!theme plain
+title Secuencia 02 — Reporte offline y sincronización (RF5 simplificado, RF14)
+
+actor "Jugador" as jugador
+participant "Vista PWA" as vista
+database "IndexedDB\n(outbox)" as idb
+participant "Service Worker\n(sw.js)" as sw
+participant "combat.routes" as routes
+participant "CombatService" as service
+database "SQLite" as db
+
+jugador -> vista : Reporta combate SIN conexión
+vista -> vista : Detecta navigator.onLine == false
+vista -> idb : Encola reporte\n(clave_idempotencia = UUID local)
+idb --> vista : encolado
+vista --> jugador : "Guardado offline.\nSe enviará al recuperar red."
+
+... Tiempo después: vuelve la conectividad ...
+sw -> sw : Evento 'online'
+sw -> idb : Lee reportes pendientes (FIFO)
+loop por cada reporte pendiente
+  sw -> routes : POST /api/combats\n(cabecera Idempotency-Key)
+  routes -> service : register_combat(dto)
+  service -> db : Busca combate con misma clave
+  alt duplicado (clave ya procesada)
+    db --> service : ya existe
+    service --> routes : 200 OK (descartado, idempotente)
+  else nuevo
+    service -> db : INSERT (estado = PENDIENTE)
+    service --> routes : 201 Created
+  end
+  routes --> sw : respuesta
+  sw -> idb : Elimina reporte de la cola
+  alt error de red durante el envío
+    sw -> sw : Reintento con backoff exponencial
+  end
+end
+sw -> vista : Refresca caché (ranking, historial)
+sw --> jugador : Notificación "Sincronización completa"
+
+@enduml

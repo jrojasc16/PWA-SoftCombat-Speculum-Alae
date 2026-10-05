@@ -1,0 +1,6 @@
+{
+  "name": "Speculum-Alae Ranking",
+  "short_name": "SA Ranking",
+  "start_url": "/ranking",
+  "display": "standalone"
+}

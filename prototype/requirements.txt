@@ -1,0 +1,8 @@
+# Dependencias del monolito Flask + SQLite (prototipo)
+flask
+flask-sqlalchemy
+flask-login
+flask-migrate
+flask-bcrypt
+pytest
+pytest-cov

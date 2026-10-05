@@ -1,0 +1,1 @@
+"""Proyecciones/consultas del historial."""
