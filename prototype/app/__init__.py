@@ -55,6 +55,11 @@ def create_app(config_name="development"):
     app.register_blueprint(history_bp)
     app.register_blueprint(public_api_bp)
 
+    # Manejador global: errores de dominio → JSON consistente (tarea 2.7)
+    from app.shared.errors import register_error_handlers
+
+    register_error_handlers(app)
+
     @app.shell_context_processor
     def shell_context():
         """Contexto de `flask shell`: db disponible sin importar."""

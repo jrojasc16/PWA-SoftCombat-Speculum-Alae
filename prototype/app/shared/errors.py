@@ -38,3 +38,18 @@ class ConflictError(DomainError):
     """Conflicto de estado o duplicidad (HTTP 409)."""
 
     status_code = 409
+
+
+def register_error_handlers(app):
+    """Registra el manejador global de errores de dominio en la app.
+
+    Traduce cualquier ``DomainError`` (y subclases) a una respuesta JSON
+    consistente: ``{"error": mensaje}`` con el código ``status_code`` de la
+    excepción. Las vistas HTML reciben el mismo contrato en el MVP (el render
+    de páginas de error llega con los templates del Sprint 7).
+    """
+    from flask import jsonify
+
+    @app.errorhandler(DomainError)
+    def handle_domain_error(err: DomainError):
+        return jsonify({"error": err.message}), err.status_code
