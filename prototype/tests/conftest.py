@@ -25,3 +25,21 @@ def app():
 def client(app):
     """Cliente HTTP de pruebas (sin levantar servidor)."""
     return app.test_client()
+
+
+@pytest.fixture
+def roles(app):
+    """Siembra los 4 roles fijos en la BD de pruebas (equivale a la migración de datos).
+
+    Devuelve un dict nombre → Role para asignar role_id en los tests.
+    """
+    from app.modules.iam.models import Role
+
+    creados = {}
+    for nombre in ("jugador", "arbitro", "admin", "super_admin"):
+        rol = Role(name=nombre)
+        _db.session.add(rol)
+        creados[nombre] = rol
+    _db.session.commit()
+    return creados
+
