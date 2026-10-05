@@ -39,6 +39,9 @@ def create_app(config_name="development"):
         if app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite"):
             event.listens_for(Engine, "connect")(_activar_wal_sqlite)
 
+    # Importar modelos para que Alembic los detecte en `flask db migrate`.
+    from app.modules.iam import models as _iam_models  # noqa: F401
+
     # Blueprints de los módulos (capa routes → services → repositories → models)
     from app.modules.combat.routes import bp as combat_bp
     from app.modules.history.routes import bp as history_bp
