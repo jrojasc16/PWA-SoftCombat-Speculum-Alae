@@ -9,6 +9,8 @@ Decisiones de diseño:
 - ``community_id`` NOT NULL en todas las tablas de negocio (RNF006).
 - ``processed`` (default ``False``) es la clave de **idempotencia** del recálculo
   Elo: un combate jamás se reprocesa (regla transversal 2).
+- ``client_request_id`` + restricción única por emisor dan **idempotencia del
+  reporte**: los reenvíos en modo offline (RF5) no duplican el combate.
 """
 
 from datetime import datetime, timezone
@@ -38,6 +40,8 @@ class Combat(db.Model):
     )
     # Fecha en que se jugó el combate (no puede ser futura).
     played_at = db.Column(db.DateTime, nullable=False)
+    # Clave de idempotencia del reporte (offline/reintento); única por emisor.
+    client_request_id = db.Column(db.String(64), nullable=True)
     # Idempotencia del recálculo Elo: True = ya fue procesado (nunca se repite).
     processed = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
     created_at = db.Column(db.DateTime, nullable=False, default=_utc_ahora)
@@ -56,6 +60,13 @@ class Combat(db.Model):
     __table_args__ = (
         # Consulta frecuente: combates de una comunidad por estado (Sprint 4.4/10.3).
         db.Index("ix_combats_community_status", "community_id", "status"),
+        # Idempotencia del reporte: la misma clave no puede repetirse por emisor.
+        db.UniqueConstraint(
+            "community_id",
+            "reporter_id",
+            "client_request_id",
+            name="uq_combats_idempotencia",
+        ),
     )
 
     @property

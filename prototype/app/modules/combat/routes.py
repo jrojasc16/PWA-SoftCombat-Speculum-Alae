@@ -45,16 +45,19 @@ def crear_combate():
     """Reporta un combate nuevo (queda ``PENDIENTE``).
 
     - ``201``: combate creado en estado ``PENDIENTE``.
+    - ``200``: ``client_request_id`` ya existía → se devuelve el combate
+      original sin crear otro (idempotencia de los reenvíos offline, RF5).
     """
     data = payload_json_o_formulario()
-    combate = services.report_combat(
+    combate, creado = services.report_combat(
         reporter_id=current_user.id,
         participants=data.get("participants"),
         winner=data.get("winner"),
         played_at=data.get("played_at"),
         referee_id=data.get("referee_id"),
+        client_request_id=data.get("client_request_id"),
     )
-    return jsonify(_combat_json(combate)), 201
+    return jsonify(_combat_json(combate)), 201 if creado else 200
 
 
 @bp.get("/combats/pending")

@@ -21,6 +21,23 @@ class CombatRepository:
         return db.session.get(Combat, combat_id)
 
     @staticmethod
+    def get_by_idempotency_key(
+        community_id: int, reporter_id: int, client_request_id: str
+    ) -> Combat | None:
+        """Devuelve el combate ya reportado con esa clave de idempotencia o None."""
+        return (
+            db.session.execute(
+                db.select(Combat).filter_by(
+                    community_id=community_id,
+                    reporter_id=reporter_id,
+                    client_request_id=client_request_id,
+                )
+            )
+            .scalars()
+            .first()
+        )
+
+    @staticmethod
     def add(combat: Combat) -> Combat:
         """Persiste el aggregate (flush para disponer del id; commit fuera)."""
         db.session.add(combat)

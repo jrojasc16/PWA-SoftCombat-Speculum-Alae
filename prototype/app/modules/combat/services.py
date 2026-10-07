@@ -24,6 +24,8 @@ ROLES_ARBITRO = frozenset({"arbitro", "admin", "super_admin"})
 # (Art. 30 está dentro de la REGLA 6 — modalidad individual).
 PARTICIPANTES_REQUERIDOS = 2
 
+_CLIENTE_MAX = 64  # longitud máxima de client_request_id
+
 
 def _utc_ahora() -> datetime:
     """Ahora en UTC como datetime naive (SQLite no almacena husos)."""
@@ -95,7 +97,8 @@ def report_combat(
     winner,
     played_at,
     referee_id=None,
-) -> Combat:
+    client_request_id=None,
+) -> tuple[Combat, bool]:
     """Registra un combate nuevo en estado ``PENDIENTE`` (RF6).
 
     Args:
@@ -104,9 +107,13 @@ def report_combat(
         winner: id del ganador, que debe ser uno de los participantes.
         played_at: fecha de juego (``datetime`` o string ISO-8601), no futura.
         referee_id: árbitro asignado (opcional; debe tener rol de árbitro).
+        client_request_id: clave de idempotencia por emisor (opcional, ≤64
+            caracteres) para que los reenvíos offline no dupliquen el combate.
 
     Returns:
-        El combate recién creado en estado ``PENDIENTE``.
+        ``(combat, creado)`` — ``creado`` es ``False`` cuando la clave de
+        idempotencia ya existía: se devuelve el combate original sin crear
+        otro ni producir ningún efecto secundario.
 
     Raises:
         NotFoundError: usuario referenciado inexistente (404).
@@ -152,12 +159,26 @@ def report_combat(
     if fecha > _utc_ahora():
         raise DomainError("La fecha del combate no puede estar en el futuro.")
 
+    # Clave de idempotencia: si ya existe, no se crea nada nuevo (RF5).
+    clave = (client_request_id or "").strip() or None
+    if clave is not None:
+        if len(clave) > _CLIENTE_MAX:
+            raise DomainError(
+                f"'client_request_id' no puede superar {_CLIENTE_MAX} caracteres."
+            )
+        existente = CombatRepository.get_by_idempotency_key(
+            community_id, reporter.id, clave
+        )
+        if existente is not None:
+            return existente, False
+
     combate = Combat(
         community_id=community_id,
         reporter_id=reporter.id,
         referee_id=arbitro.id if arbitro else None,
         status=EstadoCombate.PENDIENTE,
         played_at=fecha,
+        client_request_id=clave,
         processed=False,
     )
     for usuario in participantes:
@@ -175,4 +196,4 @@ def report_combat(
 
     CombatRepository.add(combat)
     CombatRepository.save()
-    return combate
+    return combate, True
