@@ -1,9 +1,8 @@
 """Modelos ORM: Combat (aggregate, flag processed), CombatParticipant, Confirmation, AuditLog.
 
 El aggregate ``Combat`` es la unidad de persistencia que confirma un duelo y
-dispara el recálculo Elo (Sprint 6). ``Confirmation`` y ``AuditLog`` llegan en
-el Sprint 5 (tareas 5.1 y 5.3) y se declaran en este módulo para que Alembic
-los detecte junto al resto.
+dispara el recálculo Elo (Sprint 6). ``Confirmation`` (Sprint 5.1) se declara
+en este módulo; ``AuditLog`` llega en la tarea 5.3.
 
 Decisiones de diseño:
 - ``community_id`` NOT NULL en todas las tablas de negocio (RNF006).
@@ -52,6 +51,14 @@ class Combat(db.Model):
         cascade="all, delete-orphan",
         lazy="selectin",
         order_by="CombatParticipant.id",
+    )
+
+    confirmations = db.relationship(
+        "Confirmation",
+        back_populates="combat",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="Confirmation.id",
     )
 
     reporter = db.relationship("User", foreign_keys=[reporter_id])
@@ -110,3 +117,44 @@ class CombatParticipant(db.Model):
 
     def __repr__(self) -> str:  # pragma: no cover - representación de depuración
         return f"<CombatParticipant c={self.combat_id} u={self.user_id} {self.result}>"
+
+
+class Confirmation(db.Model):
+    """Confirmación individual de un combate por parte de un usuario.
+
+    Cada participante (o el árbitro asignado) declara una vez qué participante
+    ganó. Dos declaraciones coincidentes cierran el combate en ``CONFIRMADO`` y
+    discrepantes lo mandan a ``CONFLICTO`` (RF8: dos participantes **o** un
+    árbitro; en conflicto prevalece el árbitro).
+    """
+
+    __tablename__ = "confirmations"
+
+    id = db.Column(db.Integer, primary_key=True)
+    combat_id = db.Column(
+        db.Integer, db.ForeignKey("combats.id"), nullable=False, index=True
+    )
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    # Resultado reportado por el confirmador: {"winner_id": <id del ganador>}.
+    # Se guarda como JSON (tipo declarado en el diagrama de clases) para que dos
+    # confirmaciones sean comparables directamente: coinciden si ganador_id es igual.
+    reported_result = db.Column(db.JSON, nullable=False)
+    # RNF006: aislamiento multi-comunidad desde el inicio.
+    community_id = db.Column(db.Integer, nullable=False, index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=_utc_ahora)
+
+    combat = db.relationship("Combat", back_populates="confirmations")
+    user = db.relationship("User")
+
+    __table_args__ = (
+        # Un usuario confirma un combate como máximo una vez.
+        db.UniqueConstraint("combat_id", "user_id", name="uq_confirmation_user"),
+    )
+
+    @property
+    def ganador_id(self) -> int | None:
+        """id del participante que este confirmador declara ganador."""
+        return (self.reported_result or {}).get("winner_id")
+
+    def __repr__(self) -> str:  # pragma: no cover - representación de depuración
+        return f"<Confirmation c={self.combat_id} u={self.user_id} winner={self.ganador_id}>"
