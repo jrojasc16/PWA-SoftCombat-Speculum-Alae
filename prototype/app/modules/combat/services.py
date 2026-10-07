@@ -271,11 +271,33 @@ def _asignar_ganador(combate: Combat, ganador_id: int) -> None:
 def _cerrar_confirmado(combate: Combat, ganador_id: int) -> None:
     """Cierra el combate en ``CONFIRMADO`` alineando el resultado declarado.
 
-    HOOK SPRINT 6: al pasar a un estado terminal (CONFIRMADO/RESUELTO) es
-    donde entra el recálculo on-write del ranking (ranking.services).
+    El recálculo Elo on-write se lanza en :func:`confirm_combat` justo antes
+    del commit, para que el cambio de estado y los índices viajen en la misma
+    transacción (RNF008).
     """
     _asignar_ganador(combate, ganador_id)
     combate.status = transicionar(combate.status, EstadoCombate.CONFIRMADO)
+
+
+def _procesar_elo(combat_id: int, *, completo: bool = False) -> None:
+    """HOOK (Sprint 6): dispara el recálculo Elo del combate en la misma sesión.
+
+    Args:
+        combat_id: combate terminal cuyo índice hay que actualizar.
+        completo: ``True`` reconstruye toda la comunidad desde el historial
+            (edición admin, RNF008); ``False`` procesa solo este combate.
+
+    La importación es diferida para evitar un ciclo de imports
+    (``ranking.services`` lee los modelos de combate).
+    """
+    if completo:
+        from app.modules.ranking.services import recalculate_full
+
+        recalculate_full(combat_id=combat_id, commit=False)
+    else:
+        from app.modules.ranking.services import process_confirmed_combat
+
+        process_confirmed_combat(combat_id, commit=False)
 
 
 def confirm_combat(user_id, combat_id, result) -> Combat:
@@ -351,7 +373,14 @@ def confirm_combat(user_id, combat_id, result) -> Combat:
             else:
                 combate.status = transicionar(combate.status, EstadoCombate.CONFLICTO)
 
-    CombatRepository.save()
+    try:
+        if combate.status is EstadoCombate.CONFIRMADO:
+            # RNF008: índice actualizado en la misma transacción que el cierre.
+            _procesar_elo(combate.id)
+        CombatRepository.save()
+    except Exception:
+        CombatRepository.rollback()
+        raise
     return combate
 
 
@@ -489,8 +518,13 @@ def admin_edit_result(admin_id, combat_id, nuevos_datos) -> Combat:
             )
         )
 
-    CombatRepository.save()
-    # HOOK SPRINT 6: aquí entra el recálculo on-write del ranking
-    # (ranking.services) con el resultado ya definitivo del combate.
+    try:
+        # HOOK TAREA 6.4: la edición admin cambia resultados que ya pudieron
+        # procesarse, así que aquí entra el recálculo COMPLETO de la comunidad
+        # desde el historial (ranking.services.recalculate_full).
+        CombatRepository.save()
+    except Exception:
+        CombatRepository.rollback()
+        raise
     return combate
 
