@@ -1,5 +1,8 @@
 """Blueprint iam: endpoints de registro, login, logout, usuarios y roles.
 
+Las entradas de los métodos post y get son JSON (enviadas por el body de la petición) o formulario web (enviado por el navegador).
+Las salidas son JSON.
+
 Las rutas solo adaptan HTTP ↔ servicios (regla transversal 4): parsean la
 petición, llaman a ``services`` y serializan la respuesta. Los errores de
 dominio se propagan al manejador global (tarea 2.7).
