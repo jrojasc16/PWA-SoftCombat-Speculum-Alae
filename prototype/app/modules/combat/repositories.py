@@ -3,13 +3,14 @@
 Única capa del módulo que toca SQLAlchemy (regla transversal 4). Los servicios
 trabajan contra esta interfaz y no conocen detalles de la sesión ni de la BD.
 
-``ConfirmationRepository`` se añade en la tarea 5.2 y ``AuditLogRepository``
-en la 5.3, junto a sus modelos.
+``ConfirmationRepository`` y ``AuditLogRepository`` se añaden en las tareas
+5.2 y 5.3, junto a sus modelos.
 """
 
 from app.extensions import db
 from app.modules.combat.domain.estados import EstadoCombate
 from app.modules.combat.models import (
+    AuditLog,
     Combat,
     CombatParticipant,
     Confirmation,
@@ -130,6 +131,35 @@ class ConfirmationRepository:
         db.session.add(confirmation)
         db.session.flush()
         return confirmation
+
+    @staticmethod
+    def save() -> None:
+        """Confirma la transacción en curso (Unit of Work del servicio llamante)."""
+        db.session.commit()
+
+
+class AuditLogRepository:
+    """Acceso a datos de la auditoría de ediciones manuales (inmutable)."""
+
+    @staticmethod
+    def add(entry: AuditLog) -> AuditLog:
+        """Registra una entrada de auditoría (flush para disponer del id)."""
+        db.session.add(entry)
+        db.session.flush()
+        return entry
+
+    @staticmethod
+    def entradas_de(combat_id: int) -> list[AuditLog]:
+        """Todas las ediciones de un combate en orden cronológico."""
+        return list(
+            db.session.execute(
+                db.select(AuditLog)
+                .where(AuditLog.combat_id == combat_id)
+                .order_by(AuditLog.id)
+            )
+            .scalars()
+            .all()
+        )
 
     @staticmethod
     def save() -> None:

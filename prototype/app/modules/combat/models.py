@@ -1,8 +1,8 @@
 """Modelos ORM: Combat (aggregate, flag processed), CombatParticipant, Confirmation, AuditLog.
 
 El aggregate ``Combat`` es la unidad de persistencia que confirma un duelo y
-dispara el recálculo Elo (Sprint 6). ``Confirmation`` (Sprint 5.1) se declara
-en este módulo; ``AuditLog`` llega en la tarea 5.3.
+dispara el recálculo Elo (Sprint 6). ``Confirmation`` (5.1) y ``AuditLog`` (5.3)
+se declaran en este módulo para que Alembic los detecte junto al resto.
 
 Decisiones de diseño:
 - ``community_id`` NOT NULL en todas las tablas de negocio (RNF006).
@@ -59,6 +59,14 @@ class Combat(db.Model):
         cascade="all, delete-orphan",
         lazy="selectin",
         order_by="Confirmation.id",
+    )
+
+    auditoria = db.relationship(
+        "AuditLog",
+        back_populates="combat",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="AuditLog.id",
     )
 
     reporter = db.relationship("User", foreign_keys=[reporter_id])
@@ -158,3 +166,34 @@ class Confirmation(db.Model):
 
     def __repr__(self) -> str:  # pragma: no cover - representación de depuración
         return f"<Confirmation c={self.combat_id} u={self.user_id} winner={self.ganador_id}>"
+
+
+class AuditLog(db.Model):
+    """Registro de auditoría de una edición manual de un combate por un admin.
+
+    RNF008: el admin puede editar el resultado (cualquier estado), pero cada
+    modificación deja traza permanente — campo, valor anterior y nuevo — que
+    no se puede borrar ni editar.
+    """
+
+    __tablename__ = "audit_logs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    combat_id = db.Column(
+        db.Integer, db.ForeignKey("combats.id"), nullable=False, index=True
+    )
+    admin_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    # Campo del combate que cambió (p. ej. "winner_id", "played_at").
+    campo = db.Column(db.String(60), nullable=False)
+    # Valores antes/después serializados; la traza es inmutable.
+    valor_anterior = db.Column(db.Text, nullable=True)
+    valor_nuevo = db.Column(db.Text, nullable=True)
+    # RNF006: aislamiento multi-comunidad desde el inicio.
+    community_id = db.Column(db.Integer, nullable=False, index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=_utc_ahora)
+
+    combat = db.relationship("Combat", back_populates="auditoria")
+    admin = db.relationship("User", foreign_keys=[admin_id])
+
+    def __repr__(self) -> str:  # pragma: no cover - representación de depuración
+        return f"<AuditLog c={self.combat_id} admin={self.admin_id} campo={self.campo}>"
