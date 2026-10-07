@@ -2,6 +2,7 @@
 
 - ``login_redirect``: para vistas HTML, redirige a la página de login si no hay
   sesión (la identidad la resuelve Flask-Login).
+- ``api_login_required``: para endpoints JSON, responde 401 (nunca redirige).
 - ``role_required``: para API y panel, exige uno de los roles indicados
   (401 sin sesión, 403 con rol insuficiente) — RBAC de roles fijos del MVP
   sobre la tabla ``roles`` (PROPUESTA §4.3).
@@ -25,6 +26,23 @@ def login_redirect(view):
     def wrapper(*args, **kwargs):
         if not current_user.is_authenticated:
             return redirect(url_for("iam.login_view", next=request.path))
+        return view(*args, **kwargs)
+
+    return wrapper
+
+
+def api_login_required(view):
+    """Endpoint JSON protegido: sin sesión devuelve 401 (nunca redirige).
+
+    Los endpoints JSON no deben responder con una redirección HTML, así que en
+    lugar del ``login_required`` de Flask-Login se propaga ``AuthError`` y el
+    manejador global lo traduce a ``{"error": …}`` con código 401.
+    """
+
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        if not current_user.is_authenticated:
+            raise AuthError("Autenticación requerida.")
         return view(*args, **kwargs)
 
     return wrapper
