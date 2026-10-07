@@ -1,1 +1,101 @@
-"""Modelos ORM: Combat (aggregate, flag processed), CombatParticipant, Confirmation, AuditLog."""
+"""Modelos ORM: Combat (aggregate, flag processed), CombatParticipant, Confirmation, AuditLog.
+
+El aggregate ``Combat`` es la unidad de persistencia que confirma un duelo y
+dispara el recálculo Elo (Sprint 6). ``Confirmation`` y ``AuditLog`` llegan en
+el Sprint 5 (tareas 5.1 y 5.3) y se declaran en este módulo para que Alembic
+los detecte junto al resto.
+
+Decisiones de diseño:
+- ``community_id`` NOT NULL en todas las tablas de negocio (RNF006).
+- ``processed`` (default ``False``) es la clave de **idempotencia** del recálculo
+  Elo: un combate jamás se reprocesa (regla transversal 2).
+"""
+
+from datetime import datetime, timezone
+
+from app.extensions import db
+from app.modules.combat.domain.estados import EstadoCombate, ResultadoParticipante
+
+# Marca de tiempo en UTC **sin tz** (SQLite no guarda husos; comparaciones simples).
+def _utc_ahora() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+class Combat(db.Model):
+    """Combate individual reportado por la comunidad (aggregate raíz)."""
+
+    __tablename__ = "combats"
+
+    id = db.Column(db.Integer, primary_key=True)
+    # RNF006: aislamiento multi-comunidad desde el inicio.
+    community_id = db.Column(db.Integer, nullable=False, index=True)
+    # Quien envía el reporte (participante o árbitro): autoría del registro.
+    reporter_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    # Árbitro asignado: nullable (los reportes entre jugadores no lo traen).
+    referee_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    status = db.Column(
+        db.Enum(EstadoCombate), nullable=False, default=EstadoCombate.PENDIENTE
+    )
+    # Fecha en que se jugó el combate (no puede ser futura).
+    played_at = db.Column(db.DateTime, nullable=False)
+    # Idempotencia del recálculo Elo: True = ya fue procesado (nunca se repite).
+    processed = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+    created_at = db.Column(db.DateTime, nullable=False, default=_utc_ahora)
+
+    participants = db.relationship(
+        "CombatParticipant",
+        back_populates="combat",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="CombatParticipant.id",
+    )
+
+    reporter = db.relationship("User", foreign_keys=[reporter_id])
+    referee = db.relationship("User", foreign_keys=[referee_id])
+
+    __table_args__ = (
+        # Consulta frecuente: combates de una comunidad por estado (Sprint 4.4/10.3).
+        db.Index("ix_combats_community_status", "community_id", "status"),
+    )
+
+    @property
+    def ganador_id(self) -> int | None:
+        """id del participante marcado con VICTORIA (None si no hay resultado)."""
+        for participante in self.participants:
+            if participante.result == ResultadoParticipante.VICTORIA:
+                return participante.user_id
+        return None
+
+    @property
+    def participante_ids(self) -> list[int]:
+        """ids de los participantes en orden de declaración."""
+        return [p.user_id for p in self.participants]
+
+    def __repr__(self) -> str:  # pragma: no cover - representación de depuración
+        return f"<Combat {self.id} {self.status}>"
+
+
+class CombatParticipant(db.Model):
+    """Participante de un combate con el resultado declarado a su favor."""
+
+    __tablename__ = "combat_participants"
+
+    id = db.Column(db.Integer, primary_key=True)
+    combat_id = db.Column(
+        db.Integer, db.ForeignKey("combats.id"), nullable=False, index=True
+    )
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    result = db.Column(db.Enum(ResultadoParticipante), nullable=False)
+    # RNF006: aislamiento multi-comunidad desde el inicio.
+    community_id = db.Column(db.Integer, nullable=False, index=True)
+
+    combat = db.relationship("Combat", back_populates="participants")
+    user = db.relationship("User")
+
+    __table_args__ = (
+        # Un usuario no puede figurar dos veces en el mismo combate.
+        db.UniqueConstraint("combat_id", "user_id", name="uq_combat_user"),
+    )
+
+    def __repr__(self) -> str:  # pragma: no cover - representación de depuración
+        return f"<CombatParticipant c={self.combat_id} u={self.user_id} {self.result}>"

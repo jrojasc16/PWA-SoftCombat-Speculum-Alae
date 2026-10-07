@@ -40,6 +40,7 @@ def create_app(config_name="development"):
             event.listens_for(Engine, "connect")(_activar_wal_sqlite)
 
     # Importar modelos para que Alembic los detecte en `flask db migrate`.
+    from app.modules.combat import models as _combat_models  # noqa: F401
     from app.modules.iam import models as _iam_models  # noqa: F401
 
     # Blueprints de los módulos (capa routes → services → repositories → models)
