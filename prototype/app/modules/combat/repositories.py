@@ -75,6 +75,25 @@ class CombatRepository:
         return list(db.session.execute(consulta).scalars().all())
 
     @staticmethod
+    def listar_terminales(community_id: int) -> list[Combat]:
+        """Combates ``CONFIRMADO``/``RESUELTO`` en orden cronológico de juego.
+
+        Es la cola de entrada del recálculo completo de la comunidad (Sprint 6.4):
+        se reprocesa en el mismo orden en que se jugaron.
+        """
+        consulta = (
+            db.select(Combat)
+            .where(
+                Combat.community_id == community_id,
+                Combat.status.in_(
+                    [EstadoCombate.CONFIRMADO, EstadoCombate.RESUELTO]
+                ),
+            )
+            .order_by(Combat.played_at.asc(), Combat.id.asc())
+        )
+        return list(db.session.execute(consulta).scalars().all())
+
+    @staticmethod
     def listar_admin(
         community_id: int, status: EstadoCombate | None = None
     ) -> list[Combat]:

@@ -187,3 +187,47 @@ def process_confirmed_combat(combat_id, *, commit: bool = True) -> bool:
             RatingRepository.rollback()
         raise
     return True
+
+
+def recalculate_full(community_id, *, commit: bool = True) -> int:
+    """Reconstruye los índices de una comunidad desde su historial (RF9/RNF008).
+
+    Se usa en dos casos: la edición manual de un admin (que puede cambiar un
+    resultado ya procesado) y el recálculo manual del panel (tarea 6.4).
+
+    Pasos, todo en **una sola transacción**:
+
+    1. Borra ``RatingHistory`` y ``Rating`` de la comunidad (se reconstruyen).
+    2. Recorre los combates terminales **ordenados cronológicamente**.
+    3. Aplica cada duelo con ``domain/elo.py`` y marca ``processed = True``.
+    4. Commit único (o el de la llamada si ``commit=False``).
+
+    Args:
+        community_id: comunidad a reconstruir.
+        commit: ``False`` cuando el Unit of Work lo cierra otro servicio.
+
+    Returns:
+        Número de combates reprocesados.
+
+    Raises:
+        DomainError: algún combate terminal no tiene resultado válido.
+    """
+    try:
+        RatingHistoryRepository.borrar_de_comunidad(community_id)
+        RatingRepository.borrar_de_comunidad(community_id)
+
+        ratings: dict[int, Rating] = {}
+        procesados = 0
+        for combat in CombatRepository.listar_terminales(community_id):
+            procesar_duelo(combat, ratings)
+            combat.processed = True
+            procesados += 1
+
+        if commit:
+            RatingRepository.save()
+    except Exception:
+        if commit:
+            RatingRepository.rollback()
+        raise
+    return procesados
+

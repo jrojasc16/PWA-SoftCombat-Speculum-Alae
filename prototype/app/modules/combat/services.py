@@ -279,25 +279,30 @@ def _cerrar_confirmado(combate: Combat, ganador_id: int) -> None:
     combate.status = transicionar(combate.status, EstadoCombate.CONFIRMADO)
 
 
-def _procesar_elo(combat_id: int, *, completo: bool = False) -> None:
-    """HOOK (Sprint 6): dispara el recálculo Elo del combate en la misma sesión.
+def _procesar_elo(combat_id: int) -> None:
+    """HOOK (Sprint 6): recálculo on-write del combate en la misma sesión.
 
-    Args:
-        combat_id: combate terminal cuyo índice hay que actualizar.
-        completo: ``True`` reconstruye toda la comunidad desde el historial
-            (edición admin, RNF008); ``False`` procesa solo este combate.
+    Se lanza justo antes del commit de :func:`confirm_combat` para que el
+    cierre del combate y los índices viajen en la misma transacción (RNF008).
 
     La importación es diferida para evitar un ciclo de imports
     (``ranking.services`` lee los modelos de combate).
     """
-    if completo:
-        from app.modules.ranking.services import recalculate_full
+    from app.modules.ranking.services import process_confirmed_combat
 
-        recalculate_full(combat_id=combat_id, commit=False)
-    else:
-        from app.modules.ranking.services import process_confirmed_combat
+    process_confirmed_combat(combat_id, commit=False)
 
-        process_confirmed_combat(combat_id, commit=False)
+
+def _recalcular_comunidad(community_id: int) -> None:
+    """HOOK (Sprint 6): recálculo COMPLETO de la comunidad en la misma sesión.
+
+    La edición admin puede cambiar un resultado **ya procesado**, así que no
+    basta con reprocesar ese combate (se duplicarían deltas): se reconstruyen
+    todos los índices replayando el historial.
+    """
+    from app.modules.ranking.services import recalculate_full
+
+    recalculate_full(community_id, commit=False)
 
 
 def confirm_combat(user_id, combat_id, result) -> Combat:
@@ -519,9 +524,8 @@ def admin_edit_result(admin_id, combat_id, nuevos_datos) -> Combat:
         )
 
     try:
-        # HOOK TAREA 6.4: la edición admin cambia resultados que ya pudieron
-        # procesarse, así que aquí entra el recálculo COMPLETO de la comunidad
-        # desde el historial (ranking.services.recalculate_full).
+        # RNF008: la edición admin puede cambiar resultados ya procesados.
+        _recalcular_comunidad(combate.community_id)
         CombatRepository.save()
     except Exception:
         CombatRepository.rollback()
