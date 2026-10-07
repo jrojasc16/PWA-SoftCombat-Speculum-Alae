@@ -6,6 +6,7 @@ admin (5.3) y edición manual del resultado (5.4). Las transiciones de estado
 viven en ``domain/estados.py`` (puro).
 """
 
+from collections.abc import Mapping
 from datetime import datetime, timezone
 
 from app.modules.combat.domain.estados import (
@@ -14,19 +15,28 @@ from app.modules.combat.domain.estados import (
     transicionar,
 )
 from app.modules.combat.models import (
+    AuditLog,
     Combat,
     CombatParticipant,
     Confirmation,
 )
 from app.modules.combat.repositories import (
+    AuditLogRepository,
     ConfirmationRepository,
     CombatRepository,
 )
 from app.modules.iam.repositories import UserRepository
-from app.shared.errors import ConflictError, DomainError, NotFoundError
+from app.shared.errors import (
+    ConflictError,
+    DomainError,
+    ForbiddenError,
+    NotFoundError,
+)
 
 # Roles que pueden actuar como árbitro (tabla `roles` fija del MVP: 4.3).
 ROLES_ARBITRO = frozenset({"arbitro", "admin", "super_admin"})
+# Roles que pueden editar resultados a mano (RBAC del MVP: 2 estados de roles).
+ROLES_ADMIN = frozenset({"admin", "super_admin"})
 
 # Un combate de ranking individual enfrenta a exactamente dos jugadores
 # (Art. 30 está dentro de la REGLA 6 — modalidad individual).
@@ -244,14 +254,11 @@ def _ganador_reportado(result, combate: Combat) -> int:
     return ganador_id
 
 
-def _cerrar_confirmado(combate: Combat, ganador_id: int) -> None:
-    """Cierra el combate en ``CONFIRMADO`` alineando el resultado declarado.
+def _asignar_ganador(combate: Combat, ganador_id: int) -> None:
+    """Reescribe ``result`` de cada participante para reflejar el ganador.
 
-    El resultado confirmado es el que manda: se reescribe ``result`` de cada
-    participante para que el aggregate quede coherente antes del recálculo Elo.
-
-    HOOK SPRINT 6: al pasar a un estado terminal (CONFIRMADO/RESUELTO) es
-    donde entra el recálculo on-write del ranking (ranking.services).
+    El resultado confirmado/editado es el que manda: el aggregate queda
+    coherente antes de cualquier recálculo Elo.
     """
     for participante in combate.participants:
         participante.result = (
@@ -259,6 +266,15 @@ def _cerrar_confirmado(combate: Combat, ganador_id: int) -> None:
             if participante.user_id == ganador_id
             else ResultadoParticipante.DERROTA
         )
+
+
+def _cerrar_confirmado(combate: Combat, ganador_id: int) -> None:
+    """Cierra el combate en ``CONFIRMADO`` alineando el resultado declarado.
+
+    HOOK SPRINT 6: al pasar a un estado terminal (CONFIRMADO/RESUELTO) es
+    donde entra el recálculo on-write del ranking (ranking.services).
+    """
+    _asignar_ganador(combate, ganador_id)
     combate.status = transicionar(combate.status, EstadoCombate.CONFIRMADO)
 
 
@@ -336,5 +352,141 @@ def confirm_combat(user_id, combat_id, result) -> Combat:
                 combate.status = transicionar(combate.status, EstadoCombate.CONFLICTO)
 
     CombatRepository.save()
+    return combate
+
+
+def _texto(valor) -> str | None:
+    """Serializa un valor para guardarlo como traza de auditoría."""
+    return None if valor is None else str(valor)
+
+
+def _normalizar_edicion(campo: str, valor, combate: Combat) -> tuple[str, object]:
+    """Valida un campo editable y devuelve su nombre canónico y valor normalizado.
+
+    Raises:
+        DomainError: campo no editable o valor inválido para ese campo.
+    """
+    if campo in ("winner", "winner_id"):
+        if valor is None or valor == "":
+            raise DomainError("El campo 'winner_id' es obligatorio.")
+        try:
+            ganador_id = int(valor)
+        except (TypeError, ValueError) as exc:
+            raise DomainError("'winner_id' debe ser un identificador numérico.") from exc
+        if ganador_id not in combate.participante_ids:
+            raise DomainError(
+                "'winner_id' debe ser uno de los participantes del combate "
+                f"({', '.join(str(i) for i in combate.participante_ids)})."
+            )
+        return "winner_id", ganador_id
+
+    if campo == "played_at":
+        return "played_at", _normalizar_fecha(valor)
+
+    if campo == "referee_id":
+        if valor is None or valor == "":
+            return "referee_id", None
+        arbitro = _usuario_o_error(valor, "referee_id")
+        if arbitro.community_id != combate.community_id:
+            raise DomainError(
+                f"El árbitro debe pertenecer a la comunidad {combate.community_id}."
+            )
+        if arbitro.role.name not in ROLES_ARBITRO:
+            raise DomainError(f"El usuario {arbitro.id} no tiene rol de árbitro.")
+        return "referee_id", arbitro.id
+
+    raise DomainError(
+        f"El campo '{campo}' no es editable. Campos editables: "
+        "winner_id, played_at, referee_id."
+    )
+
+
+def admin_edit_result(admin_id, combat_id, nuevos_datos) -> Combat:
+    """Edición manual de un combate por un administrador (RF9 / RNF008).
+
+    Reglas de dominio:
+
+    - Permitido en **cualquier** estado, incluso ya ``RESUELTO``.
+    - Solo ``admin``/``super_admin`` (403 para el resto).
+    - Cada campo modificado deja una entrada en ``AuditLog`` con el valor
+      anterior y el nuevo; también se audita el cambio de estado.
+    - Al terminar el combate queda en ``RESUELTO``.
+
+    Args:
+        admin_id: administrador que ejecuta la edición.
+        combat_id: combate a editar.
+        nuevos_datos: campos a cambiar — ``winner_id`` (o ``winner``),
+            ``played_at`` y/o ``referee_id`` (``None`` lo desasigna).
+
+    Returns:
+        El combate editado y en estado ``RESUELTO``.
+
+    Raises:
+        NotFoundError: combate o usuario inexistente (404).
+        ForbiddenError: quien edita no es administrador (403).
+        DomainError: objeto inválido, campo no editable, valor inválido o
+            combate ya ``RESUELTO`` sin cambios que aplicar (400).
+    """
+    combate = CombatRepository.get_by_id(combat_id)
+    if combate is None:
+        raise NotFoundError(f"No existe el combate {combat_id}.")
+
+    admin = _usuario_o_error(admin_id, "admin_id")
+    if admin.role.name not in ROLES_ADMIN:
+        raise ForbiddenError("Solo un administrador puede editar el resultado de un combate.")
+
+    if not isinstance(nuevos_datos, Mapping):
+        raise DomainError("'nuevos_datos' debe ser un objeto con los campos a editar.")
+
+    valores: dict[str, object] = {}
+    for campo, valor in nuevos_datos.items():
+        nombre, normalizado = _normalizar_edicion(campo, valor, combate)
+        if nombre in valores:
+            raise DomainError(f"El campo '{nombre}' aparece más de una vez.")
+        valores[nombre] = normalizado
+
+    actuales = {
+        "winner_id": combate.ganador_id,
+        "played_at": combate.played_at,
+        "referee_id": combate.referee_id,
+    }
+    cambios = {c: (actuales[c], v) for c, v in valores.items() if actuales[c] != v}
+
+    if not cambios and combate.status is EstadoCombate.RESUELTO:
+        raise DomainError(f"El combate {combate.id} no tiene cambios que aplicar.")
+
+    for campo, (anterior, nuevo) in cambios.items():
+        if campo == "winner_id":
+            _asignar_ganador(combate, nuevo)
+        else:
+            setattr(combate, campo, nuevo)
+        AuditLogRepository.add(
+            AuditLog(
+                combat_id=combate.id,
+                admin_id=admin.id,
+                campo=campo,
+                valor_anterior=_texto(anterior),
+                valor_nuevo=_texto(nuevo),
+                community_id=combate.community_id,
+            )
+        )
+
+    if combate.status is not EstadoCombate.RESUELTO:
+        estado_anterior = combate.status
+        combate.status = transicionar(combate.status, EstadoCombate.RESUELTO)
+        AuditLogRepository.add(
+            AuditLog(
+                combat_id=combate.id,
+                admin_id=admin.id,
+                campo="status",
+                valor_anterior=estado_anterior.value,
+                valor_nuevo=EstadoCombate.RESUELTO.value,
+                community_id=combate.community_id,
+            )
+        )
+
+    CombatRepository.save()
+    # HOOK SPRINT 6: aquí entra el recálculo on-write del ranking
+    # (ranking.services) con el resultado ya definitivo del combate.
     return combate
 
