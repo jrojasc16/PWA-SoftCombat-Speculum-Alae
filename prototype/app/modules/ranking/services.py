@@ -186,7 +186,19 @@ def process_confirmed_combat(combat_id, *, commit: bool = True) -> bool:
         if commit:
             RatingRepository.rollback()
         raise
+    if commit:
+        _invalidar_caché()
     return True
+
+
+def _invalidar_caché() -> None:
+    """Invalida la caché del endpoint público tras tocar índices (RNF004).
+
+    Import diferido para evitar un ciclo con ``public_api``.
+    """
+    from app.modules.public_api.services import invalidar_cache
+
+    invalidar_cache()
 
 
 def recalculate_full(community_id, *, commit: bool = True) -> int:
@@ -229,5 +241,6 @@ def recalculate_full(community_id, *, commit: bool = True) -> int:
         if commit:
             RatingRepository.rollback()
         raise
+    _invalidar_caché()
     return procesados
 

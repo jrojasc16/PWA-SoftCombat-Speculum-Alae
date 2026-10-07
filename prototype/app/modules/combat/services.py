@@ -293,6 +293,17 @@ def _procesar_elo(combat_id: int) -> None:
     process_confirmed_combat(combat_id, commit=False)
 
 
+def _invalidar_caché_ranking() -> None:
+    """Invalida la caché del ranking público tras cambiar índices (RNF004).
+
+    Import diferido para no crear un ciclo con ``public_api`` (que importa los
+    repositorios de ranking).
+    """
+    from app.modules.public_api.services import invalidar_cache
+
+    invalidar_cache()
+
+
 def _recalcular_comunidad(community_id: int) -> None:
     """HOOK (Sprint 6): recálculo COMPLETO de la comunidad en la misma sesión.
 
@@ -386,6 +397,7 @@ def confirm_combat(user_id, combat_id, result) -> Combat:
     except Exception:
         CombatRepository.rollback()
         raise
+    _invalidar_caché_ranking()
     return combate
 
 
@@ -530,5 +542,6 @@ def admin_edit_result(admin_id, combat_id, nuevos_datos) -> Combat:
     except Exception:
         CombatRepository.rollback()
         raise
+    _invalidar_caché_ranking()
     return combate
 

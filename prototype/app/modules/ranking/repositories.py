@@ -4,6 +4,8 @@
 servicios trabajan contra esta interfaz y no conocen la sesión ni la BD.
 """
 
+from sqlalchemy.orm import selectinload
+
 from app.extensions import db
 from app.modules.ranking.models import Rating, RatingHistory
 
@@ -25,6 +27,7 @@ class RatingRepository:
             db.session.execute(
                 db.select(Rating)
                 .where(Rating.community_id == community_id)
+                .options(selectinload(Rating.user))
                 .order_by(Rating.points.desc(), Rating.id.asc())
             )
             .scalars()
