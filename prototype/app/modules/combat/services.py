@@ -1,9 +1,9 @@
 """Casos de uso combate: aggregate, máquina de estados, prioridad de árbitro, auditoría.
 
-Sprint 4: registro de un combate con todas las validaciones de dominio. Las
-transiciones de estado viven en ``domain/estados.py`` (puro) y aquí se usa
-exclusivamente el estado inicial ``PENDIENTE``; las confirmaciones (5.2), la
-edición admin (5.4) y la auditoría (5.3) se añaden en el Sprint 5.
+Sprint 4: registro de un combate con todas las validaciones de dominio.
+Sprint 5: confirmaciones de participantes/árbitro (5.2), auditoría de ediciones
+admin (5.3) y edición manual del resultado (5.4). Las transiciones de estado
+viven en ``domain/estados.py`` (puro).
 """
 
 from datetime import datetime, timezone
@@ -11,11 +11,19 @@ from datetime import datetime, timezone
 from app.modules.combat.domain.estados import (
     EstadoCombate,
     ResultadoParticipante,
+    transicionar,
 )
-from app.modules.combat.models import Combat, CombatParticipant
-from app.modules.combat.repositories import CombatRepository
+from app.modules.combat.models import (
+    Combat,
+    CombatParticipant,
+    Confirmation,
+)
+from app.modules.combat.repositories import (
+    ConfirmationRepository,
+    CombatRepository,
+)
 from app.modules.iam.repositories import UserRepository
-from app.shared.errors import DomainError, NotFoundError
+from app.shared.errors import ConflictError, DomainError, NotFoundError
 
 # Roles que pueden actuar como árbitro (tabla `roles` fija del MVP: 4.3).
 ROLES_ARBITRO = frozenset({"arbitro", "admin", "super_admin"})
@@ -203,3 +211,130 @@ def report_combat(
     CombatRepository.add(combate)
     CombatRepository.save()
     return combate, True
+
+
+def _ganador_reportado(result, combate: Combat) -> int:
+    """Extrae y valida el id del ganador que declara el confirmador.
+
+    Args:
+        result: resultado reportado — ``{"winner_id": n}``, ``{"winner": n}``
+            o el id directamente (los formularios envían un campo suelto).
+        combate: combate en curso (para validar que sea un participante).
+
+    Returns:
+        id del participante que este confirmador declara ganador.
+
+    Raises:
+        DomainError: campo ausente, no numérico o que no es un participante.
+    """
+    valor = result.get("winner_id", result.get("winner")) if isinstance(result, dict) else result
+    if valor is None or valor == "":
+        raise DomainError("El campo 'winner_id' es obligatorio.")
+    try:
+        ganador_id = int(valor)
+    except (TypeError, ValueError) as exc:
+        raise DomainError("El campo 'winner_id' debe ser un identificador numérico.") from exc
+
+    ids = combate.participante_ids
+    if ganador_id not in ids:
+        raise DomainError(
+            f"'winner_id' debe ser uno de los participantes del combate "
+            f"({', '.join(str(i) for i in ids)})."
+        )
+    return ganador_id
+
+
+def _cerrar_confirmado(combate: Combat, ganador_id: int) -> None:
+    """Cierra el combate en ``CONFIRMADO`` alineando el resultado declarado.
+
+    El resultado confirmado es el que manda: se reescribe ``result`` de cada
+    participante para que el aggregate quede coherente antes del recálculo Elo.
+
+    HOOK SPRINT 6: al pasar a un estado terminal (CONFIRMADO/RESUELTO) es
+    donde entra el recálculo on-write del ranking (ranking.services).
+    """
+    for participante in combate.participants:
+        participante.result = (
+            ResultadoParticipante.VICTORIA
+            if participante.user_id == ganador_id
+            else ResultadoParticipante.DERROTA
+        )
+    combate.status = transicionar(combate.status, EstadoCombate.CONFIRMADO)
+
+
+def confirm_combat(user_id, combat_id, result) -> Combat:
+    """Registra la confirmación de un combate (RF8).
+
+    Reglas de dominio:
+
+    - Solo puede confirmar un **participante** o el **árbitro asignado**.
+    - Cada usuario confirma **una sola vez** (reenvíos → 409).
+    - Dos participantes con el mismo ganador declarado → ``CONFIRMADO``.
+    - Dos participantes con ganadores distintos → ``CONFLICTO``.
+    - La confirmación del **árbitro asignado** cierra en ``CONFIRMADO``
+      inmediatamente y **prevalece** sobre lo que hayan declarado los
+      participantes (RF8: en conflicto prevalece el árbitro).
+
+    Args:
+        user_id: quién confirma.
+        combat_id: combate a confirmar.
+        result: resultado reportado (``{"winner_id": n}`` o el id del ganador).
+
+    Returns:
+        El combate con su nuevo estado.
+
+    Raises:
+        NotFoundError: combate o usuario inexistentes (404).
+        ConflictError: este usuario ya había confirmado (409).
+        DomainError: combate cerrado, quien confirma sin derecho, o
+            ``winner_id`` que no es un participante (400).
+    """
+    combate = CombatRepository.get_by_id(combat_id)
+    if combate is None:
+        raise NotFoundError(f"No existe el combate {combat_id}.")
+
+    confirmador = _usuario_o_error(user_id, "user_id")
+
+    if combate.status not in (EstadoCombate.PENDIENTE, EstadoCombate.CONFLICTO):
+        raise DomainError(
+            f"El combate {combate.id} ya está cerrado (estado "
+            f"{combate.status.value}): no admite más confirmaciones."
+        )
+
+    es_arbitro = combate.referee_id == confirmador.id
+    ids = combate.participante_ids
+    if not es_arbitro and confirmador.id not in ids:
+        raise DomainError("Solo puede confirmar el combate un participante o el árbitro asignado.")
+
+    if ConfirmationRepository.get(combate.id, confirmador.id) is not None:
+        raise ConflictError(f"El usuario {confirmador.id} ya confirmó el combate {combate.id}.")
+
+    ganador_id = _ganador_reportado(result, combate)
+    ConfirmationRepository.add(
+        Confirmation(
+            combat_id=combate.id,
+            user_id=confirmador.id,
+            reported_result={"winner_id": ganador_id},
+            community_id=combate.community_id,
+        )
+    )
+
+    if es_arbitro:
+        # Prioridad del árbitro: cierra el combate con lo que él declare.
+        _cerrar_confirmado(combate, ganador_id)
+    elif combate.status is EstadoCombate.PENDIENTE:
+        confirmaciones = [
+            c
+            for c in ConfirmationRepository.confirmaciones_de(combate.id)
+            if c.user_id in ids
+        ]
+        if len(confirmaciones) == PARTICIPANTES_REQUERIDOS:
+            ganadores = {c.ganador_id for c in confirmaciones}
+            if len(ganadores) == 1:
+                _cerrar_confirmado(combate, ganador_id)
+            else:
+                combate.status = transicionar(combate.status, EstadoCombate.CONFLICTO)
+
+    CombatRepository.save()
+    return combate
+

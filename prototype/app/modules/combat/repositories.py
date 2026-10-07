@@ -3,13 +3,17 @@
 Única capa del módulo que toca SQLAlchemy (regla transversal 4). Los servicios
 trabajan contra esta interfaz y no conocen detalles de la sesión ni de la BD.
 
-``ConfirmationRepository`` y ``AuditLogRepository`` se añaden en el Sprint 5
-(tareas 5.1 y 5.3), junto a sus modelos.
+``ConfirmationRepository`` se añade en la tarea 5.2 y ``AuditLogRepository``
+en la 5.3, junto a sus modelos.
 """
 
 from app.extensions import db
 from app.modules.combat.domain.estados import EstadoCombate
-from app.modules.combat.models import Combat, CombatParticipant
+from app.modules.combat.models import (
+    Combat,
+    CombatParticipant,
+    Confirmation,
+)
 
 
 class CombatRepository:
@@ -95,3 +99,39 @@ class CombatParticipantRepository:
             .scalars()
             .all()
         )
+
+
+class ConfirmationRepository:
+    """Acceso a datos de las confirmaciones de un combate."""
+
+    @staticmethod
+    def get(combat_id: int, user_id: int) -> Confirmation | None:
+        """Devuelve la confirmación de ese usuario en ese combate o None."""
+        return db.session.execute(
+            db.select(Confirmation).filter_by(combat_id=combat_id, user_id=user_id)
+        ).scalars().first()
+
+    @staticmethod
+    def confirmaciones_de(combat_id: int) -> list[Confirmation]:
+        """Todas las confirmaciones del combate en orden de llegada."""
+        return list(
+            db.session.execute(
+                db.select(Confirmation)
+                .where(Confirmation.combat_id == combat_id)
+                .order_by(Confirmation.id)
+            )
+            .scalars()
+            .all()
+        )
+
+    @staticmethod
+    def add(confirmation: Confirmation) -> Confirmation:
+        """Persiste la confirmación (flush para disponer del id)."""
+        db.session.add(confirmation)
+        db.session.flush()
+        return confirmation
+
+    @staticmethod
+    def save() -> None:
+        """Confirma la transacción en curso (Unit of Work del servicio llamante)."""
+        db.session.commit()
