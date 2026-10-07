@@ -1,8 +1,10 @@
 name: CI
 
+# Se ejecuta en cada push (incluida la rama de desarrollo de sprints) y en los
+# PR hacia main, para que la salida de pytest + cobertura quede guardada como
+# evidencia en cada tarea (Sprint 3.6).
 on:
   push:
-    branches: [main]
   pull_request:
     branches: [main]
 
@@ -23,4 +25,20 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Tests con cobertura (ranking >= 70 %, RNF007)
-        run: python -m pytest --cov=app.modules.ranking --cov-fail-under=70 --cov-report=term-missing
+        run: >
+          python -m pytest -v
+          --cov=app.modules.ranking
+          --cov-fail-under=70
+          --cov-report=term-missing
+          --cov-report=xml:coverage.xml
+          --junitxml=pytest-junit.xml
+
+      - name: Guardar salida de pytest y cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reporte-cobertura-ranking
+          path: |
+            prototype/coverage.xml
+            prototype/pytest-junit.xml
+          if-no-files-found: ignore
