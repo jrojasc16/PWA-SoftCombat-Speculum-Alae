@@ -73,7 +73,13 @@ def _usuario_o_error(user_id, campo: str):
 
 
 def _ids_participantes(participants) -> list[int]:
-    """Valida la lista de participantes: exactamente 2 y distintos."""
+    """Valida la lista de participantes: exactamente 2 y distintos.
+
+    Acepta lista/tupla de ids o, para los formularios web, una cadena
+    separada por comas (``"3,7"``).
+    """
+    if isinstance(participants, str):
+        participants = [p.strip() for p in participants.split(",") if p.strip()]
     if not isinstance(participants, (list, tuple, set)):
         raise DomainError("'participants' debe ser una lista de identificadores.")
     try:
@@ -194,6 +200,6 @@ def report_combat(
             )
         )
 
-    CombatRepository.add(combat)
+    CombatRepository.add(combate)
     CombatRepository.save()
     return combate, True
