@@ -21,6 +21,7 @@ Restricciones de diseño (plan de desarrollo, tareas 3.2–3.3):
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import Enum
 import math
 
@@ -29,11 +30,13 @@ from .constants import RATING_INICIAL, TABLA_T, TABLA_X
 __all__ = [
     "RATING_INICIAL",
     "Resultado",
+    "DueloResultado",
     "expected_score",
     "t_factor",
     "x_factor",
     "k_factor",
     "new_ratings",
+    "resolver_duelo",
 ]
 
 # Constante de escala de la fórmula Elo (Art. 30, págs. 13–15).
@@ -49,6 +52,20 @@ class Resultado(str, Enum):
 
     VICTORIA_A = "victoria_a"
     VICTORIA_B = "victoria_b"
+
+
+@dataclass(frozen=True, slots=True)
+class DueloResultado:
+    """Evaluación completa de un combate (nuevo índice, esperanzas y variaciones)."""
+
+    nuevo_a: float
+    nuevo_b: float
+    esperado_a: float
+    esperado_b: float
+    k_a: float
+    k_b: float
+    delta_a: float
+    delta_b: float
 
 
 def _validar_rating(valor: float, nombre: str) -> float:
@@ -188,3 +205,37 @@ def new_ratings(
     nuevo_a = a + ka * (r_a - esperado_a)
     nuevo_b = b + kb * (r_b - esperado_b)
     return nuevo_a, nuevo_b
+
+
+def resolver_duelo(
+    rating_a: float,
+    rating_b: float,
+    combates_a: int,
+    percentil_a: float,
+    combates_b: int,
+    percentil_b: float,
+    resultado: Resultado | str,
+) -> DueloResultado:
+    """Evalúa un combate completo: k de cada jugador + nuevos índices.
+
+    Atajo que combina :func:`k_factor` y :func:`new_ratings` y devuelve un
+    objeto inmutable con todos los datos derivados (útil como Unit of Work del
+    recálculo on-write, Sprint 6).
+
+    Raises:
+        ValueError: si alguna entrada es inválida (ver funciones anteriores).
+    """
+    k_a = k_factor(combates_a, percentil_a)
+    k_b = k_factor(combates_b, percentil_b)
+    nuevo_a, nuevo_b = new_ratings(rating_a, rating_b, resultado, k_a, k_b)
+    esperado_a = expected_score(rating_a, rating_b)
+    return DueloResultado(
+        nuevo_a=nuevo_a,
+        nuevo_b=nuevo_b,
+        esperado_a=esperado_a,
+        esperado_b=1.0 - esperado_a,
+        k_a=k_a,
+        k_b=k_b,
+        delta_a=nuevo_a - rating_a,
+        delta_b=nuevo_b - rating_b,
+    )
