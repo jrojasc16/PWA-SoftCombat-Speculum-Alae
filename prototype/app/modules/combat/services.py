@@ -423,7 +423,8 @@ def admin_edit_result(admin_id, combat_id, nuevos_datos) -> Combat:
 
     Raises:
         NotFoundError: combate o usuario inexistente (404).
-        ForbiddenError: quien edita no es administrador (403).
+        ForbiddenError: quien edita no es administrador o pertenece a otra
+            comunidad (403).
         DomainError: objeto inválido, campo no editable, valor inválido o
             combate ya ``RESUELTO`` sin cambios que aplicar (400).
     """
@@ -434,6 +435,9 @@ def admin_edit_result(admin_id, combat_id, nuevos_datos) -> Combat:
     admin = _usuario_o_error(admin_id, "admin_id")
     if admin.role.name not in ROLES_ADMIN:
         raise ForbiddenError("Solo un administrador puede editar el resultado de un combate.")
+    if admin.community_id != combate.community_id:
+        # RNF006: aislamiento de datos entre comunidades.
+        raise ForbiddenError("No tienes permisos para editar combates de otra comunidad.")
 
     if not isinstance(nuevos_datos, Mapping):
         raise DomainError("'nuevos_datos' debe ser un objeto con los campos a editar.")

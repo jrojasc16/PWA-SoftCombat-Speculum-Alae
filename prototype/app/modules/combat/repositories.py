@@ -75,6 +75,17 @@ class CombatRepository:
         return list(db.session.execute(consulta).scalars().all())
 
     @staticmethod
+    def listar_admin(
+        community_id: int, status: EstadoCombate | None = None
+    ) -> list[Combat]:
+        """Combates de la comunidad para el panel admin (opcionalmente por estado)."""
+        consulta = db.select(Combat).where(Combat.community_id == community_id)
+        if status is not None:
+            consulta = consulta.where(Combat.status == status)
+        consulta = consulta.order_by(Combat.played_at.desc(), Combat.id.desc())
+        return list(db.session.execute(consulta).scalars().all())
+
+    @staticmethod
     def save() -> None:
         """Confirma la transacción en curso (Unit of Work del servicio llamante)."""
         db.session.commit()
