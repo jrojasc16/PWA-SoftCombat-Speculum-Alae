@@ -14,6 +14,7 @@ from flask_login import current_user, login_required, login_user, logout_user
 from app.extensions import login_manager
 from app.modules.iam import services
 from app.modules.iam.repositories import UserRepository
+from app.shared.decorators import api_login_required
 from app.shared.errors import AuthError
 
 bp = Blueprint("iam", __name__)
@@ -82,3 +83,15 @@ def me():
     if not current_user.is_authenticated:
         raise AuthError("Autenticación requerida.")
     return jsonify(_user_json(current_user)), 200
+
+
+@bp.get("/me/community")
+@api_login_required
+def mi_comunidad():
+    """Directorio de mi comunidad para los formularios de la PWA (RF6/RF8).
+
+    Devuelve mi usuario (``yo``), los demás ``jugadores`` y los ``arbitros``
+    con **solo** id, nombre y rol: el formulario de reportar resuelve así
+    nombre → id sin publicar correos. Pide sesión (401 en caso contrario).
+    """
+    return jsonify(services.comunidad_de(current_user)), 200

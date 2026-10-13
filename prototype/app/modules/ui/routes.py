@@ -108,6 +108,29 @@ def ranking():
     )
 
 
+@bp.get("/reportar")
+@login_redirect
+def reportar():
+    """Formulario de reporte de combate (RF6).
+
+    La página es solo el shell: el envío se hace con fetch contra
+    ``POST /combats`` (Sprint 7.6), de modo que el formulario comparte el
+    mismo contrato que la API y no necesita una segunda lógica de validación.
+    """
+    return render_template("reportar.html")
+
+
+@bp.get("/pendientes")
+@login_redirect
+def pendientes():
+    """Confirmaciones que esperan de mí (RF8).
+
+    Igual que ``/reportar``: el shell lo pinta el servidor y la lista se carga
+    con fetch a ``GET /combats/pending`` (Sprint 7.6).
+    """
+    return render_template("pendientes.html")
+
+
 @bp.route("/login", methods=["GET", "POST"])
 def login_view():
     """Página de inicio de sesión (RF1): formulario HTML sobre la API IAM.

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block titulo %}Pendientes — Speculum-Alae{% endblock %}
+
+{% block contenido %}
+<section>
+  <h1>Confirmaciones pendientes</h1>
+  <p class="ayuda">
+    Combates en los que apareces como participante o como árbitro y que aún no
+    están cerrados. Elige el ganador real: si ambos coinciden, el combate se
+    confirma y el ranking se actualiza.
+  </p>
+
+  <noscript>
+    <p class="mensaje mensaje-error">
+      Esta página necesita JavaScript activo para cargar tus pendientes.
+    </p>
+  </noscript>
+
+  <p id="estado-pendientes" class="mensaje" role="status" hidden></p>
+
+  <div id="lista-pendientes" aria-live="polite">
+    <p class="vacio">Cargando tus combates…</p>
+  </div>
+</section>
+{% endblock %}

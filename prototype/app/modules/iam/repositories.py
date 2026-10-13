@@ -4,6 +4,8 @@
 trabajan contra esta interfaz y no conocen detalles de la sesión ni de la BD.
 """
 
+from sqlalchemy.orm import selectinload
+
 from app.extensions import db
 from app.modules.iam.models import Role, User
 
@@ -26,6 +28,20 @@ class UserRepository:
             .scalars()
             .first()
         )
+
+    @staticmethod
+    def listar_por_comunidad(community_id: int) -> list[User]:
+        """Usuarios activos de una comunidad (directorio para los formularios).
+
+        El rol se precarga para no disparar N+1 al montar el directorio.
+        """
+        consulta = (
+            db.select(User)
+            .where(User.community_id == community_id, User.active.is_(True))
+            .options(selectinload(User.role))
+            .order_by(User.name.asc(), User.id.asc())
+        )
+        return list(db.session.execute(consulta).scalars().all())
 
     @staticmethod
     def add(user: User) -> User:

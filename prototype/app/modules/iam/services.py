@@ -80,3 +80,32 @@ def authenticate(email: str, password: str) -> User:
     ):
         raise AuthError("Credenciales inválidas.")
     return user
+
+
+# Roles que pueden actuar como árbitro en un reporte (mismos que en combate;
+# se declaran aquí para no crear una dependencia iam → combat).
+ROLES_ARBITRO = frozenset({"arbitro", "admin", "super_admin"})
+
+
+def comunidad_de(usuario: User) -> dict:
+    """Directorio mínimo de la comunidad para los formularios web (RF6/RF8).
+
+    El formulario de reporte necesita resolver **nombre → id** del oponente y
+    del árbitro sin que el jugador tenga que escribir identificadores a mano.
+
+    Solo expone id, nombre y rol: nunca correos ni hashes (RNF de datos
+    públicos). Los usuarios desactivados no aparecen.
+    """
+    miembros = UserRepository.listar_por_comunidad(usuario.community_id)
+    return {
+        "community_id": usuario.community_id,
+        "yo": {"id": usuario.id, "name": usuario.name},
+        "jugadores": [
+            {"id": u.id, "name": u.name} for u in miembros if u.id != usuario.id
+        ],
+        "arbitros": [
+            {"id": u.id, "name": u.name}
+            for u in miembros
+            if u.role.name in ROLES_ARBITRO
+        ],
+    }

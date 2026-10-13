@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block titulo %}Reportar combate — Speculum-Alae{% endblock %}
+
+{% block contenido %}
+<section>
+  <h1>Reportar combate</h1>
+  <p class="ayuda">
+    Registra el resultado de tu partida. El combate queda <strong>pendiente</strong>
+    hasta que lo confirme tu rival o el árbitro: en ese momento se actualizan
+    los índices.
+  </p>
+
+  <noscript>
+    <p class="mensaje mensaje-error">
+      Esta página necesita JavaScript activo para enviar el reporte.
+    </p>
+  </noscript>
+
+  <div class="tarjeta">
+    <p id="estado-reporte" class="mensaje" role="status" hidden></p>
+
+    <form id="form-reporte" class="formulario">
+      <label for="oponente">Oponente</label>
+      <input
+        type="text"
+        id="oponente"
+        name="oponente"
+        list="lista-jugadores"
+        required
+        autocomplete="off"
+        placeholder="Escribe o elige el nombre"
+      />
+      <datalist id="lista-jugadores"></datalist>
+
+      <label for="resultado">Resultado</label>
+      <select id="resultado" name="resultado" required>
+        <option value="yo">Gané yo</option>
+        <option value="el">Ganó el oponente</option>
+      </select>
+
+      <label for="jugado">Fecha y hora del combate</label>
+      <input type="datetime-local" id="jugado" name="jugado" required />
+
+      <label for="arbitro">Árbitro (opcional)</label>
+      <input
+        type="text"
+        id="arbitro"
+        name="arbitro"
+        list="lista-arbitros"
+        autocomplete="off"
+        placeholder="Deja vacío si no hubo árbitro asignado"
+      />
+      <datalist id="lista-arbitros"></datalist>
+
+      <button type="submit" class="boton">Enviar reporte</button>
+    </form>
+  </div>
+</section>
+{% endblock %}
