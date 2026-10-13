@@ -12,11 +12,12 @@ def test_health_responde_ok(client):
 
 
 def test_blueprints_registrados(app):
-    """Los 5 blueprints del monolito quedan registrados en la factory."""
+    """Los 6 blueprints del monolito quedan registrados en la factory."""
     assert sorted(b.name for b in app.blueprints.values()) == [
         "combat",
         "history",
         "iam",
         "public_api",
         "ranking",
+        "ui",
     ]

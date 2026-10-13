@@ -50,12 +50,16 @@ def create_app(config_name="development"):
     from app.modules.iam.routes import bp as iam_bp
     from app.modules.public_api.routes import bp as public_api_bp
     from app.modules.ranking.routes import bp as ranking_bp
+    from app.modules.ui.routes import bp as ui_bp
 
     app.register_blueprint(iam_bp)
     app.register_blueprint(combat_bp)
     app.register_blueprint(ranking_bp)
     app.register_blueprint(history_bp)
     app.register_blueprint(public_api_bp)
+    # Vistas HTML de la PWA (Sprint 7): se registran al final para que la
+    # navegación del layout no tape ninguna ruta de API.
+    app.register_blueprint(ui_bp)
 
     # Manejador global: errores de dominio → JSON consistente (tarea 2.7)
     from app.shared.errors import register_error_handlers

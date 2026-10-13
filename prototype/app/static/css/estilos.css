@@ -1,0 +1,383 @@
+/* Estilos del prototipo Speculum-Alae (Sprint 7).
+ *
+ * Mobile-first: primero el diseño de móvil y, a partir de 720px, la barra de
+ * navegación pasa a horizontal. Sin frameworks externos (RNF003: flujos
+ * principales en ≤3 pasos y usable en móvil).
+ */
+
+:root {
+  --color-fondo: #f4f5f7;
+  --color-superficie: #ffffff;
+  --color-texto: #1f2430;
+  --color-texto-suave: #5b6270;
+  --color-borde: #d9dde5;
+  --color-acento: #2f4f8f;
+  --color-acento-oscuro: #233c6e;
+  --color-error: #b3261e;
+  --color-error-fondo: #fdecea;
+  --color-ok: #1b5e20;
+  --color-ok-fondo: #e8f5e9;
+  --radio: 10px;
+  --sombra: 0 1px 3px rgba(20, 24, 34, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--color-fondo);
+  color: var(--color-texto);
+  line-height: 1.5;
+}
+
+a {
+  color: var(--color-acento);
+}
+
+/* --- Cabecera y navegación -------------------------------------------- */
+
+.cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--color-acento-oscuro);
+  color: #fff;
+}
+
+.marca {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: #fff;
+  text-decoration: none;
+  margin-right: auto;
+}
+
+.navegacion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.navegacion a {
+  color: #fff;
+  text-decoration: none;
+  padding: 0.35rem 0.25rem;
+}
+
+.navegacion a:hover,
+.navegacion a:focus-visible {
+  text-decoration: underline;
+}
+
+.nav-usuario {
+  color: #cfd8ea;
+  font-size: 0.9rem;
+}
+
+/* Menú plegable en móvil (sin JS: checkbox + label). */
+.nav-toggle-oculto {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.nav-toggle {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0.4rem;
+  cursor: pointer;
+}
+
+.nav-toggle span {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: #fff;
+}
+
+.nav-toggle-oculto:checked ~ .navegacion {
+  display: flex;
+}
+
+@media (min-width: 720px) {
+  .nav-toggle {
+    display: none;
+  }
+
+  .navegacion {
+    width: auto;
+  }
+}
+
+@media (max-width: 719.98px) {
+  .navegacion {
+    display: none;
+  }
+}
+
+/* --- Contenido --------------------------------------------------------- */
+
+.contenido {
+  flex: 1;
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.pie {
+  padding: 1rem;
+  text-align: center;
+  color: var(--color-texto-suave);
+  font-size: 0.85rem;
+}
+
+.tarjeta {
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
+  box-shadow: var(--sombra);
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.tarjeta-estrecha {
+  max-width: 420px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+h1 {
+  margin-top: 0;
+  font-size: 1.4rem;
+}
+
+.ayuda {
+  color: var(--color-texto-suave);
+  font-size: 0.95rem;
+}
+
+.lista-beneficios {
+  padding-left: 1.2rem;
+}
+
+.lista-beneficios li {
+  margin-bottom: 0.35rem;
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+/* --- Formularios ------------------------------------------------------- */
+
+.formulario {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.formulario label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-top: 0.5rem;
+}
+
+.formulario input,
+.formulario select {
+  padding: 0.55rem 0.6rem;
+  border: 1px solid var(--color-borde);
+  border-radius: 6px;
+  font-size: 1rem;
+  background: #fff;
+  color: var(--color-texto);
+}
+
+.formulario input:focus-visible,
+.formulario select:focus-visible {
+  outline: 2px solid var(--color-acento);
+  outline-offset: 1px;
+}
+
+.boton,
+.boton-secundario {
+  display: inline-block;
+  padding: 0.55rem 1rem;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  text-align: center;
+  margin-top: 0.75rem;
+}
+
+.boton {
+  background: var(--color-acento);
+  color: #fff;
+}
+
+.boton:hover,
+.boton:focus-visible {
+  background: var(--color-acento-oscuro);
+}
+
+.boton-secundario {
+  background: transparent;
+  color: var(--color-acento);
+  border-color: var(--color-acento);
+}
+
+.navegacion .boton,
+.navegacion .boton-secundario {
+  margin-top: 0;
+  padding: 0.35rem 0.75rem;
+  color: #fff;
+}
+
+.navegacion .boton-secundario {
+  border-color: #9fb2d8;
+}
+
+.enlace-secundario {
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  color: var(--color-texto-suave);
+}
+
+/* --- Mensajes ---------------------------------------------------------- */
+
+.mensaje {
+  padding: 0.6rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  margin-bottom: 0.75rem;
+}
+
+.mensaje-error {
+  background: var(--color-error-fondo);
+  color: var(--color-error);
+  border: 1px solid #f2b8b5;
+}
+
+.mensaje-ok {
+  background: var(--color-ok-fondo);
+  color: var(--color-ok);
+  border: 1px solid #a5d6a7;
+}
+
+/* --- Tablas y estados vacíos (usados desde la 7.3) --------------------- */
+
+.tabla-envoltura {
+  overflow-x: auto;
+}
+
+.tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.tabla th,
+.tabla td {
+  padding: 0.55rem 0.5rem;
+  border-bottom: 1px solid var(--color-borde);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.tabla thead th {
+  background: #eef1f6;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.tabla tbody tr:hover {
+  background: #f7f9fc;
+}
+
+.vacio {
+  text-align: center;
+  color: var(--color-texto-suave);
+  padding: 1.5rem 0.5rem;
+}
+
+.etiqueta {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: #eef1f6;
+  color: var(--color-texto-suave);
+}
+
+.etiqueta-pendiente {
+  background: #fff4e5;
+  color: #8a5300;
+}
+
+.etiqueta-confirmado {
+  background: var(--color-ok-fondo);
+  color: var(--color-ok);
+}
+
+.etiqueta-conflicto {
+  background: var(--color-error-fondo);
+  color: var(--color-error);
+}
+
+.etiqueta-resuelto {
+  background: #e7e9f7;
+  color: #303f9f;
+}
+
+.delta-positivo {
+  color: var(--color-ok);
+  font-weight: 600;
+}
+
+.delta-negativo {
+  color: var(--color-error);
+  font-weight: 600;
+}
+
+/* --- Utilidades -------------------------------------------------------- */
+
+.paginacion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.acciones-fila {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.acciones-fila .boton,
+.acciones-fila .boton-secundario {
+  margin-top: 0;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.9rem;
+}

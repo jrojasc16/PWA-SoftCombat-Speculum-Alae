@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block titulo %}Speculum-Alae — Ranking Elo{% endblock %}
+
+{% block contenido %}
+<section class="tarjeta">
+  <h1>Ranking Elo de la comunidad</h1>
+  <p class="ayuda">
+    La comunidad de SoftCombat <strong>Speculum-Alae</strong> calcula su ranking
+    con el sistema Elo del reglamento nacional (Art. 30): la constante
+    <em>k</em> depende de tus combates y de tu percentil.
+  </p>
+
+  <ul class="lista-beneficios">
+    <li>Reporta tus combates y confírmalos con tu rival o con el árbitro.</li>
+    <li>Tu índice se actualiza en el momento en que el combate queda cerrado.</li>
+    <li>Consulta tu historial con la variación de puntos de cada partida.</li>
+  </ul>
+
+  <div class="acciones">
+    {% if usuario.is_authenticated %}
+    <p class="ayuda">Ya tienes sesión iniciada como <strong>{{ usuario.name }}</strong>.</p>
+    {% else %}
+    <a class="boton" href="{{ url_for('ui.registro_view') }}">Crear cuenta</a>
+    <a class="boton-secundario" href="{{ url_for('ui.login_view') }}">Iniciar sesión</a>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

@@ -25,7 +25,7 @@ def login_redirect(view):
     @wraps(view)
     def wrapper(*args, **kwargs):
         if not current_user.is_authenticated:
-            return redirect(url_for("iam.login_view", next=request.path))
+            return redirect(url_for("ui.login_view", next=request.path))
         return view(*args, **kwargs)
 
     return wrapper
