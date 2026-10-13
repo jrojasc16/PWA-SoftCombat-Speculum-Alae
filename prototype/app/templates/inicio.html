@@ -18,11 +18,9 @@
   </ul>
 
   <div class="acciones">
-    {% if usuario.is_authenticated %}
-    <p class="ayuda">Ya tienes sesión iniciada como <strong>{{ usuario.name }}</strong>.</p>
-    {% else %}
-    <a class="boton" href="{{ url_for('ui.registro_view') }}">Crear cuenta</a>
-    <a class="boton-secundario" href="{{ url_for('ui.login_view') }}">Iniciar sesión</a>
+    <a class="boton" href="{{ url_for('ui.ranking') }}">Ver el ranking</a>
+    {% if not usuario.is_authenticated %}
+    <a class="boton-secundario" href="{{ url_for('ui.registro_view') }}">Crear cuenta</a>
     {% endif %}
   </div>
 </section>

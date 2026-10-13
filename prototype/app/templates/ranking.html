@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block titulo %}Ranking — Speculum-Alae{% endblock %}
+
+{% block contenido %}
+<section>
+  <h1>Ranking de la comunidad</h1>
+
+  {% if error %}
+  <p class="mensaje mensaje-error" role="alert">{{ error }}</p>
+  {% endif %}
+
+  <p class="ayuda">
+    Consulta pública y cacheada (mismos datos que la API). Tu índice se
+    actualiza en el momento en que un combate queda cerrado.
+  </p>
+
+  <div class="tarjeta">
+    <div class="tabla-envoltura">
+      {% if items %}
+      <table class="tabla">
+        <caption class="vacio" style="text-align: left; padding: 0 0 0.5rem">
+          {{ total }} jugador{{ "es" if total != 1 }} con índice
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Pos.</th>
+            <th scope="col">Jugador</th>
+            <th scope="col">Puntos</th>
+            <th scope="col">Combates</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in items %}
+          <tr>
+            <td>{{ item.position }}</td>
+            <td>{{ item.name }}</td>
+            <td>{{ "%.1f"|format(item.points) }}</td>
+            <td>{{ item.matches_played }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="vacio">
+        Todavía no hay combates confirmados: el ranking aparecerá con la
+        primera partida cerrada.
+      </p>
+      {% endif %}
+    </div>
+
+    <nav class="paginacion" aria-label="Paginación del ranking">
+      {% if hay_anterior %}
+      <a class="boton-secundario" href="{{ url_for('ui.ranking', page=pagina_actual - 1) }}"
+        >← Anterior</a
+      >
+      {% else %}
+      <span></span>
+      {% endif %}
+
+      <span>Página {{ pagina_actual }} de {{ total_paginas }}</span>
+
+      {% if hay_siguiente %}
+      <a class="boton-secundario" href="{{ url_for('ui.ranking', page=pagina_actual + 1) }}"
+        >Siguiente →</a
+      >
+      {% else %}
+      <span></span>
+      {% endif %}
+    </nav>
+  </div>
+</section>
+{% endblock %}

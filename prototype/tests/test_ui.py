@@ -45,7 +45,7 @@ def test_login_por_formulario_abre_sesion(client, roles):
 
     r = client.post("/login", data={"email": VALIDO["email"], "password": VALIDO["password"]})
     assert r.status_code == 302
-    assert r.headers["Location"].endswith("/")
+    assert r.headers["Location"].endswith("/ranking")
 
     me = client.get("/me")
     assert me.status_code == 200
