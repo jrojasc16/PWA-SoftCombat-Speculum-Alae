@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block titulo %}Mi historial — Speculum-Alae{% endblock %}
+
+{% block contenido %}
+<section>
+  <h1>Mi historial de combates</h1>
+
+  {% if error %}
+  <p class="mensaje mensaje-error" role="alert">{{ error }}</p>
+  {% endif %}
+
+  {% if rating %}
+  <p class="ayuda">
+    Tu índice actual es <strong>{{ "%.1f"|format(rating.points) }}</strong>
+    tras {{ rating.matches_played }} combate{{ "s" if rating.matches_played != 1 }}.
+  </p>
+  {% else %}
+  <p class="ayuda">
+    Todavía no tienes índice: aparecerá cuando se cierre tu primer combate.
+  </p>
+  {% endif %}
+
+  <div class="tarjeta">
+    <div class="tabla-envoltura">
+      {% if items %}
+      <table class="tabla">
+        <caption class="vacio" style="text-align: left; padding: 0 0 0.5rem">
+          {{ total }} combate{{ "s" if total != 1 }} en tu historial
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Fecha</th>
+            <th scope="col">Rival</th>
+            <th scope="col">Resultado</th>
+            <th scope="col">Estado</th>
+            <th scope="col">Índice</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in items %}
+          <tr>
+            <td>{{ item.played_at[:16].replace("T", " ") }}</td>
+            <td>{{ item.opponent.name if item.opponent else "—" }}</td>
+            <td>{{ item.result if item.result else "—" }}</td>
+            <td>{{ item.status }}</td>
+            <td>
+              {% if item.rating %}
+              {{ "%.1f"|format(item.rating.points_before) }} →
+              {{ "%.1f"|format(item.rating.points_after) }} ({{
+                "%+.1f"|format(item.rating.delta)
+              }})
+              {% else %}
+              sin procesar
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="vacio">
+        Aún no has jugado ningún combate. Reporta el primero desde
+        <a href="{{ url_for('ui.reportar') }}">Reportar</a>.
+      </p>
+      {% endif %}
+    </div>
+
+    <nav class="paginacion" aria-label="Paginación del historial">
+      {% if hay_anterior %}
+      <a class="boton-secundario" href="{{ url_for('ui.historial', page=pagina_actual - 1) }}"
+        >← Anterior</a
+      >
+      {% else %}
+      <span></span>
+      {% endif %}
+
+      <span>Página {{ pagina_actual }} de {{ total_paginas }}</span>
+
+      {% if hay_siguiente %}
+      <a class="boton-secundario" href="{{ url_for('ui.historial', page=pagina_actual + 1) }}"
+        >Siguiente →</a
+      >
+      {% else %}
+      <span></span>
+      {% endif %}
+    </nav>
+  </div>
+</section>
+{% endblock %}

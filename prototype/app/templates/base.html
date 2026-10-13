@@ -28,6 +28,7 @@
         {% if usuario.is_authenticated %}
         <a href="{{ url_for('ui.reportar') }}">Reportar</a>
         <a href="{{ url_for('ui.pendientes') }}">Pendientes</a>
+        <a href="{{ url_for('ui.historial') }}">Historial</a>
         <span class="nav-usuario">{{ usuario.name }}</span>
         <a class="boton-secundario" href="{{ url_for('ui.salir') }}">Salir</a>
         {% else %}

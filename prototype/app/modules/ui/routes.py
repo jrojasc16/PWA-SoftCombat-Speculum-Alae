@@ -12,6 +12,7 @@ Reglas de la capa de presentación (regla transversal 4):
 from flask import Blueprint, redirect, render_template, request, url_for
 from flask_login import current_user, login_user, logout_user
 
+from app.modules.history import services as history_services
 from app.modules.iam import services as iam_services
 from app.modules.public_api import services as public_api_services
 from app.shared.decorators import login_redirect
@@ -29,6 +30,9 @@ COMUNIDAD_POR_DEFECTO = 1
 
 # Filas por página de la tabla de ranking en la vista HTML.
 FILAS_RANKING = 25
+
+# Filas por página de la tabla del historial personal.
+FILAS_HISTORIAL = 25
 
 
 def _destino_seguro(destino) -> str:
@@ -129,6 +133,41 @@ def pendientes():
     con fetch a ``GET /combats/pending`` (Sprint 7.6).
     """
     return render_template("pendientes.html")
+
+
+@bp.get("/historial")
+@login_redirect
+def historial():
+    """Mi historial de combates con la variación del índice (RF10).
+
+    Igual que ``/ranking``: la página se pinta en el servidor consumiendo el
+    mismo payload paginado que ``GET /me/history`` (misma fuente, mismo orden
+    del más reciente al más antiguo). Pide sesión (redirige al login).
+    """
+    error = None
+    page = 1
+    try:
+        page = param_entero("page", request.args.get("page"), 1, 1)
+    except DomainError as exc:
+        # Un parámetro inválido no rompe la consulta: se avisa y se muestra
+        # la primera página.
+        error = exc.message
+
+    payload = history_services.historial_de_usuario(
+        current_user.id, current_user.community_id, page, FILAS_HISTORIAL
+    )
+    total_paginas = max(1, -(-payload["total"] // FILAS_HISTORIAL))
+    return render_template(
+        "historial.html",
+        items=payload["items"],
+        total=payload["total"],
+        rating=payload["rating"],
+        pagina_actual=page,
+        total_paginas=total_paginas,
+        hay_anterior=page > 1,
+        hay_siguiente=page < total_paginas,
+        error=error,
+    )
 
 
 @bp.route("/login", methods=["GET", "POST"])
