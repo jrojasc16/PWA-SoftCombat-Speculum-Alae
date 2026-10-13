@@ -4,6 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{% block titulo %}Speculum-Alae Ranking{% endblock %}</title>
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}" />
+    <meta name="theme-color" content="#233c6e" />
     <link
       rel="stylesheet"
       href="{{ url_for('static', filename='css/estilos.css') }}"
@@ -46,6 +48,7 @@
       <p>Comunidad SoftCombat Speculum-Alae — ranking Elo (reglamento Art. 30).</p>
     </footer>
 
+    <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
     {% block scripts %}{% endblock %}
   </body>
 </html>

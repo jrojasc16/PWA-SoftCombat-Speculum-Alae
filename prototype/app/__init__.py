@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from flask import Flask
+from flask import Flask, request
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 
@@ -70,6 +70,17 @@ def create_app(config_name="development"):
     def shell_context():
         """Contexto de `flask shell`: db disponible sin importar."""
         return {"db": db}
+
+    @app.after_request
+    def permitir_scope_raiz_sw(respuesta):
+        """Permite que el service worker de /static/ controle toda la app.
+
+        Sin esta cabecera el scope quedaría limitado a /static/ y el SW no
+        podría cachear las lecturas del ranking (PWA, Sprint 7.6).
+        """
+        if request.path == "/static/sw.js":
+            respuesta.headers["Service-Worker-Allowed"] = "/"
+        return respuesta
 
     @app.get("/health")
     def health():
