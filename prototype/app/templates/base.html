@@ -48,6 +48,9 @@
         <a href="{{ url_for('ui.reportar') }}">Reportar</a>
         <a href="{{ url_for('ui.pendientes') }}">Pendientes</a>
         <a href="{{ url_for('ui.historial') }}">Historial</a>
+        {% if usuario.role.name in ("admin", "super_admin") %}
+        <a href="{{ url_for('ui.admin_panel') }}">Admin</a>
+        {% endif %}
         <span class="nav-usuario">{{ usuario.name }}</span>
         <a id="enlace-salir" class="boton-secundario" href="{{ url_for('ui.salir') }}"
           >Salir</a

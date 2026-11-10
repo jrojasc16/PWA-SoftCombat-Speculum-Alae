@@ -2,11 +2,13 @@
 
 Reglas de la capa de presentación (regla transversal 4):
 
-- No toca SQLAlchemy: solo llama a ``iam.services``.
+- No toca SQLAlchemy: solo llama a los ``services`` de cada módulo.
 - Consume el **mismo** contrato JSON que la API: la autenticación del
   formulario usa ``authenticate``/``register_user`` y cierra con
   ``login_user`` de Flask-Login (sesión por cookie, no JWT).
 - ``next`` solo acepta rutas relativas internas (nunca un sitio externo).
+- El panel de administración (Sprint 10) vive en las mismas páginas HTML y
+  delega las escrituras en la API JSON (``/admin/...``).
 """
 
 from flask import Blueprint, redirect, render_template, request, url_for
@@ -15,7 +17,7 @@ from flask_login import current_user, login_user, logout_user
 from app.modules.history import services as history_services
 from app.modules.iam import services as iam_services
 from app.modules.public_api import services as public_api_services
-from app.shared.decorators import login_redirect
+from app.shared.decorators import login_redirect, role_required_html
 from app.shared.errors import DomainError
 from app.shared.http import PAGINA_MAXIMO, param_entero
 
@@ -245,3 +247,25 @@ def salir():
     """Cierra la sesión y vuelve al ranking (enlace de la navegación)."""
     logout_user()
     return redirect(url_for(DESPUES_DE_ENTRAR))
+
+
+# ---------------------------------------------------------------------------
+# Panel de administración (Sprint 10)
+# ---------------------------------------------------------------------------
+
+# Prefijo de las páginas HTML del panel. Las rutas JSON de administración
+# (``/admin/combats``, ``/admin/users``, ``/admin/ranking/recalculate``) viven
+# en los blueprints de sus módulos; las páginas se separan bajo ``/admin/panel``
+# para que nunca se confundan dos rutas que solo difieren en el idioma.
+PREFIJO_PANEL = "/admin/panel"
+
+
+@bp.get("/admin")
+@role_required_html("admin", "super_admin")
+def admin_panel():
+    """Portada del panel de administración (menú de las secciones).
+
+    Protegida por ``@role_required_html``: sin sesión redirige al login y con
+    rol insuficiente devuelve la página de "sin permisos" (403).
+    """
+    return render_template("admin/panel.html")

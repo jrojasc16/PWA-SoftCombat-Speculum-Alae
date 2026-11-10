@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block titulo %}Sin permisos — Speculum-Alae{% endblock %}
+
+{% block contenido %}
+<section>
+  <h1>No tienes permisos para esta sección</h1>
+
+  <div class="tarjeta">
+    <p class="ayuda">
+      Esta página es parte del panel de administración y solo puede usarla un
+      usuario con rol <strong>{{ roles }}</strong>. Tu sesión actual tiene el
+      rol <strong>{{ rol_actual }}</strong>.
+    </p>
+    <div class="acciones">
+      <a class="boton" href="{{ url_for('ui.ranking') }}">Volver al ranking</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

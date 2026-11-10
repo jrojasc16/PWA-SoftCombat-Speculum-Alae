@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block titulo %}Panel de administración — Speculum-Alae{% endblock %}
+
+{% block contenido %}
+<section>
+  <h1>Panel de administración</h1>
+  <p class="ayuda">
+    Gestión de la comunidad {{ usuario.community_id }}: usuarios, combates en
+    conflicto y recálculo del ranking.
+  </p>
+
+  <div class="tarjeta admin-tarjeta">
+    <h2>Secciones del panel</h2>
+    <div class="tabla-envoltura">
+      <table class="tabla">
+        <thead>
+          <tr>
+            <th scope="col">Sección</th>
+            <th scope="col">Qué permite</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Usuarios</td>
+            <td>
+              Listar las cuentas de la comunidad, activar o desactivar cuentas y
+              cambiar su rol.
+            </td>
+          </tr>
+          <tr>
+            <td>Combates en conflicto</td>
+            <td>
+              Revisar los combates en conflicto, declarar el resultado real y
+              consultar la bitácora de auditoría.
+            </td>
+          </tr>
+          <tr>
+            <td>Recálculo del ranking</td>
+            <td>
+              Reconstruir los índices de la comunidad replayando todos sus
+              combates cerrados, en orden cronológico.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{% endblock %}
