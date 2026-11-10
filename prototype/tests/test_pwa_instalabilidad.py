@@ -56,6 +56,13 @@ def test_el_verificador_existe_y_es_ejecutable():
     assert RUTA_VERIFICADOR.exists()
 
 
+def test_la_documentacion_de_pwa_esta_versionada():
+    """Los informes del sprint 8 (instalabilidad y pruebas manuales) existen."""
+    documentacion = RAIZ_REPO / "documentation"
+    assert (documentacion / "PWA_VERIFICACION_INSTALABILIDAD.md").exists()
+    assert (documentacion / "PRUEBAS_MANUALES_PWA.md").exists()
+
+
 def test_la_app_cumple_los_criterios_de_instalabilidad(servidor):
     verificador = _cargar_verificador()
     informe = verificador.verificar(servidor)
