@@ -5,8 +5,7 @@ disponible en el entorno de ejecución) más las pruebas del servidor que
 garantizan la idempotencia de los reenvíos (``client_request_id``).
 """
 
-import json
-import re
+from pathlib import Path
 
 import pytest
 
@@ -284,3 +283,43 @@ def test_los_estilos_de_los_estados_existen(client):
     css = client.get("/static/css/estilos.css").get_data(as_text=True)
     assert ".etiqueta-enviado" in css
     assert ".etiqueta-error" in css
+
+
+# ---------------------------------------------------------------------------
+# 9.5 — Los diagramas de la sincronización reflejan lo implementado
+# ---------------------------------------------------------------------------
+
+
+def _diagramas():
+    raiz = Path(__file__).resolve().parents[2] / "documentation" / "diagrams"
+    return (
+        raiz / "secuencia_02_offline_sync.puml",
+        raiz / "secuencia_02_offline_sync.mmd",
+    )
+
+
+def test_los_dos_diagramas_de_la_sincronizacion_existen():
+    puml, mmd = _diagramas()
+    assert puml.exists()
+    assert mmd.exists()
+
+
+def test_los_diagramas_describen_el_flujo_implementado():
+    """PlantUML es la fuente de verdad; el .mmd es su alternativa."""
+    puml, mmd = _diagramas()
+    for archivo in (puml, mmd):
+        texto = archivo.read_text(encoding="utf-8")
+        assert "client_request_id" in texto
+        assert "POST /combats" in texto
+        assert "js/sync.js" in texto
+        assert "outbox" in texto.lower()
+        assert "backoff" in texto.lower()
+        assert "200" in texto and "201" in texto
+
+
+def test_los_dos_diagramas_mantienen_los_mismos_elementos():
+    puml, mmd = _diagramas()
+    elementos = ["IndexedDB", "combat.routes", "CombatService", "SQLite"]
+    for elemento in elementos:
+        assert elemento in puml.read_text(encoding="utf-8")
+        assert elemento in mmd.read_text(encoding="utf-8")

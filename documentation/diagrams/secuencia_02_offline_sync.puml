@@ -1,42 +1,59 @@
 @startuml secuencia_02_offline_sync
 !theme plain
-title Secuencia 02 — Reporte offline y sincronización (RF5 simplificado, RF14)
+title Secuencia 02 — Reporte offline y sincronización del outbox (RF5/RF14)
 
 actor "Jugador" as jugador
-participant "Vista PWA" as vista
-database "IndexedDB\n(outbox)" as idb
+participant "Vista PWA\n(js/reportar.js)" as vista
+database "IndexedDB\n(outbox + directorio)" as idb
+participant "Script de sincronización\n(js/sync.js)" as sync
 participant "Service Worker\n(sw.js)" as sw
 participant "combat.routes" as routes
 participant "CombatService" as service
 database "SQLite" as db
 
+== Fase offline: el reporte se guarda en el dispositivo ==
 jugador -> vista : Reporta combate SIN conexión
-vista -> vista : Detecta navigator.onLine == false
-vista -> idb : Encola reporte\n(clave_idempotencia = UUID local)
+vista -> vista : Detecta navigator.onLine == false\n(usa el directorio guardado en IndexedDB)
+vista -> idb : Encola reporte\n(clave client_request_id + payload + resumen)
 idb --> vista : encolado
 vista --> jugador : "Guardado offline.\nSe enviará al recuperar red."
+vista -> vista : Muestra el reporte como\n"pendiente de envío" (lista de la vista)
 
-... Tiempo después: vuelve la conectividad ...
-sw -> sw : Evento 'online'
-sw -> idb : Lee reportes pendientes (FIFO)
+== Fase de recuperación: la cola se drena en orden ==
+... vuelve la conectividad (evento 'online' o al abrir la app) ...
+sync -> idb : Lee la cola FIFO (orden de inserción)
 loop por cada reporte pendiente
-  sw -> routes : POST /api/combats\n(cabecera Idempotency-Key)
-  routes -> service : register_combat(dto)
-  service -> db : Busca combate con misma clave
-  alt duplicado (clave ya procesada)
-    db --> service : ya existe
-    service --> routes : 200 OK (descartado, idempotente)
-  else nuevo
-    service -> db : INSERT (estado = PENDIENTE)
-    service --> routes : 201 Created
-  end
-  routes --> sw : respuesta
-  sw -> idb : Elimina reporte de la cola
-  alt error de red durante el envío
-    sw -> sw : Reintento con backoff exponencial
+  alt el reporte aún espera su reintento (backoff exponencial)
+    sync -> sync : Programa el siguiente intento\n(2 s, 4 s, 8 s… hasta 5 min)
+  else se puede enviar
+    sync -> routes : POST /combats\n(JSON con client_request_id)
+    routes -> service : report_combat(..., client_request_id)
+    service -> db : Busca combate con la misma clave
+    alt duplicado (clave ya procesada)
+      db --> service : ya existe
+      service --> routes : combate original (sin efectos)
+      routes --> sync : 200 OK
+    else nuevo
+      service -> db : INSERT (estado = PENDIENTE)
+      service --> routes : combate creado
+      routes --> sync : 201 Created
+    end
+    alt error reintentable (sin red o 5xx)
+      sync -> idb : Marca el reporte con el próximo intento
+      sync -> sync : Detiene el drenaje (conserva el orden FIFO)
+    else error definitivo (4xx de validación)
+      sync -> idb : Marca el reporte como "error" con el motivo
+      sync --> jugador : El motivo se ve en la lista de pendientes
+    else envío correcto
+      sync -> idb : Marca el reporte como "enviado"
+    end
   end
 end
-sw -> vista : Refresca caché (ranking, historial)
-sw --> jugador : Notificación "Sincronización completa"
+
+sync -> vista : Evento 'sa-outbox-cambio'\n(actualiza la lista de pendientes)
+vista -> sw : Pide GET /api/ranking y /me/history
+sw -> sw : Revalida la caché (stale-while-revalidate)\ny marca la hora de los datos
+sw --> vista : Datos con marca de tiempo (X-SW-Cache-Time)
+vista --> jugador : "Reporte enviado" y lista de pendientes al día
 
 @enduml
