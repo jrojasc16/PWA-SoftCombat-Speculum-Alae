@@ -8,10 +8,11 @@
 
 | Ítem | Estado |
 |---|---|
-| Sprints 1–7 | Completados y marcados en el plan (272 tests en verde, cobertura `app.modules.ranking` = 100 %) |
+| Sprints 1–8 | Completados y marcados en el plan |
 | Sprint 8 | **Completado** (commits `6a1c2ad`, `92b371e`, `48fcd60`, `580b7ff`, `2d10c3a`): manifest + iconos, SW stale-while-revalidate con marca de tiempo, indicador offline, verificador de instalabilidad, pruebas manuales documentadas. La ejecución con navegador real (instalación y modo avión) queda pendiente para el equipo |
+| Sprint 9 | **Completado** (commits `8d4d758`, `e71ea3e`, `0d5240f`, `fe71eed`, `86feffe` + `a850eb7`): cola `outbox` en IndexedDB, drenaje FIFO con backoff, idempotencia `client_request_id`, lista de pendientes en `/reportar`, diagramas actualizados. Verificado en Microsoft Edge headless (9 pasos OK) |
 | Working tree | Limpio salvo este documento de trabajo (`documentation/CHECKLIST_FINALIZACION.md`) |
-| Push al remoto | **Pendiente** — la rama `desarrollo-sprint-7` no existe en `origin` (35 commits locales) |
+| Push al remoto | **Pendiente** — la rama `desarrollo-sprint-7` no existe en `origin` (42 commits locales) |
 | Entregables "stub" | `prototype/docs/openapi.yaml` (1 línea), `prototype/wordpress-plugin/ranking-table.php` (5 líneas), `prototype/app/static/db.js` (6 líneas) |
 | Diagramas | Fuentes `.puml`/`.mmd` existentes, **sin PNG exportados** (requerido por 18 espacios reservados del `.docx` v2) |
 | Documentación | `.docx` v2 redactado; faltan las figuras PNG |
@@ -42,14 +43,14 @@ Comando de verificación local: `cd prototype && ../venv/bin/python -m pytest -q
 
 ---
 
-## Sprint 9 — Outbox offline (IndexedDB) y sincronización
+## Sprint 9 — Outbox offline (IndexedDB) y sincronización — **COMPLETADO**
 
-- [ ] **9.1** `static/db.js`: wrapper mínimo de IndexedDB con store `outbox` (payload + `client_request_id` + timestamp) — hoy es solo un comentario placeholder (`prototype/app/static/db.js`).
-- [ ] **9.2** Al reportar sin conexión → encolar; al recuperar red (evento `online` + al abrir la app) → drenar la cola **en orden**, con reintento y backoff exponencial.
-- [ ] **9.3** Reutilizar `client_request_id` (Sprint 4.5) para que el servidor descarte duplicados sin error visible (respuesta 200 idempotente ya existente).
-- [ ] **9.4** UI: listado de “reportes pendientes de envío” con estado por ítem (en `/reportar` o vista propia).
-- [ ] **9.5** Actualizar `secuencia_02_offline_sync.{puml,mmd}` (y re-exportar PNG) si el flujo difiere del diagrama.
-- [ ] **9.6** Tests JS (o test de integración del endpoint de idempotencia) y prueba manual modo avión → reconectar → llega una sola vez.
+- [x] **9.1** `static/db.js`: wrapper de IndexedDB con store `outbox` (payload + `client_request_id` + timestamp) y store `directorio` → commit `8d4d758`.
+- [x] **9.2** Al reportar sin conexión → encolar; al recuperar red (`online` + al abrir) → drenar la cola **en orden**, con reintento y backoff exponencial → commit `e71ea3e` (`static/js/sync.js`).
+- [x] **9.3** Reutilizar `client_request_id` (Sprint 4.5) para que el servidor descarte duplicados sin error visible → commit `0d5240f` (clave generada antes de enviar, reutilizada en el reintento; 200 = «ya estaba registrado»).
+- [x] **9.4** UI: listado de «reportes pendientes de envío» con estado por ítem en `/reportar` → commit `fe71eed`.
+- [x] **9.5** Diagramas `secuencia_02_offline_sync.{puml,mmd}` actualizados con el flujo real → commit `86feffe`.
+- [x] **Verificación del sprint** en navegador real (Microsoft Edge headless): `scripts/verificar_offline_browser.py` + `scripts/harness_offline.html` + `scripts/cdp_esperar_resultado.mjs` → commit `a850eb7` (9 pasos OK).
 
 ---
 
