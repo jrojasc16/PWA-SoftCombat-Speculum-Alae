@@ -323,3 +323,33 @@ def test_los_dos_diagramas_mantienen_los_mismos_elementos():
     for elemento in elementos:
         assert elemento in puml.read_text(encoding="utf-8")
         assert elemento in mmd.read_text(encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# Verificación del sprint: la cola offline en un navegador real
+# ---------------------------------------------------------------------------
+
+
+def test_existen_las_herramientas_de_verificacion_en_navegador():
+    raiz = Path(__file__).resolve().parents[2]
+    assert (raiz / "scripts" / "verificar_offline_browser.py").exists()
+    assert (raiz / "scripts" / "harness_offline.html").exists()
+    assert (raiz / "scripts" / "cdp_esperar_resultado.mjs").exists()
+
+
+def test_la_pagina_de_prueba_cubre_el_ciclo_offline_completo():
+    raiz = Path(__file__).resolve().parents[2]
+    html = (raiz / "scripts" / "harness_offline.html").read_text(encoding="utf-8")
+    assert "SASync.encolar" in html
+    assert "SASync.sincronizar" in html
+    assert "client_request_id" in html
+    assert 'id="resultado"' in html
+
+
+def test_el_script_de_verificacion_usa_el_protocolo_devtools():
+    raiz = Path(__file__).resolve().parents[2]
+    script = (raiz / "scripts" / "verificar_offline_browser.py").read_text(
+        encoding="utf-8"
+    )
+    assert "cdp_esperar_resultado.mjs" in script
+    assert "--remote-debugging-port" in script

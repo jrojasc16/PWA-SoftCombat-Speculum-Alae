@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>Prueba de la cola offline</title>
+  </head>
+  <body>
+    <h1>Prueba automática de la cola offline (Sprint 9)</h1>
+    <p>
+      Esta página la usa <code>scripts/verificar_offline_browser.py</code> con un
+      navegador sin interfaz. Simula el flujo «reporte sin conexión → se
+      encola → al recuperar la red se envía una sola vez» y deja el resultado
+      en el elemento <code>#resultado</code>.
+    </p>
+    <pre id="resultado">PENDIENTE</pre>
+
+    <script src="/static/db.js"></script>
+    <script src="/static/js/sync.js"></script>
+    <script>
+      (function () {
+        "use strict";
+
+        const salida = document.getElementById("resultado");
+        const pasos = [];
+
+        function registrar(nombre, condicion, detalle) {
+          pasos.push({
+            nombre: nombre,
+            ok: Boolean(condicion),
+            detalle: detalle === undefined ? "" : String(detalle),
+          });
+        }
+
+        function esperar(ms) {
+          return new Promise((resolver) => setTimeout(resolver, ms));
+        }
+
+        async function registrarUsuario(correo, nombre) {
+          const respuesta = await fetch("/auth/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify({ email: correo, password: "password123", name: nombre }),
+          });
+          return { estado: respuesta.status, datos: await respuesta.json() };
+        }
+
+        async function combatesPropios(reporterId) {
+          const respuesta = await fetch("/combats/pending", {
+            headers: { Accept: "application/json" },
+            credentials: "same-origin",
+          });
+          const lista = await respuesta.json();
+          return lista.filter((c) => c.reporter_id === reporterId);
+        }
+
+        async function ejecutar() {
+          try {
+            // 1) Dos usuarios de prueba (el rival se registra primero; el
+            //    último registro es el que deja la sesión activa).
+            const sufijo = Date.now().toString(36);
+            const rival = await registrarUsuario(
+              "rival-" + sufijo + "@test.local",
+              "Rival " + sufijo
+            );
+            registrar("registro del rival", rival.estado === 201, "HTTP " + rival.estado);
+
+            const yo = await registrarUsuario(
+              "prueba-" + sufijo + "@test.local",
+              "Prueba Offline " + sufijo
+            );
+            registrar("registro del jugador", yo.estado === 201, "HTTP " + yo.estado);
+
+            // 2) Se espera a que el drenaje automático del script de
+            //    sincronización termine (al abrir la página).
+            await esperar(800);
+
+            const cuerpo = {
+              participants: [yo.datos.id, rival.datos.id],
+              winner: yo.datos.id,
+              played_at: "2026-11-01T18:00:00",
+            };
+
+            // 3) Fase offline: el reporte se encola sin enviarlo.
+            const clave = window.SASync.nuevaClave();
+            const item = await window.SASync.encolar(cuerpo, {
+              autor_id: yo.datos.id,
+              client_request_id: clave,
+              resumen: {
+                oponente: "Rival " + sufijo,
+                resultado: "Gané yo",
+                jugado: cuerpo.played_at,
+              },
+            });
+            registrar(
+              "el reporte queda encolado como pendiente",
+              item && item.estado === "pendiente",
+              item ? item.estado : "sin ítem"
+            );
+
+            const antes = await combatesPropios(yo.datos.id);
+            registrar(
+              "mientras está encolado el servidor no tiene el combate",
+              antes.length === 0,
+              "combates en el servidor: " + antes.length
+            );
+
+            // 4) Fase de recuperación: al volver la red se drena la cola.
+            let resultado = await window.SASync.sincronizar();
+            if (resultado.enviados === 0) {
+              await esperar(400);
+              resultado = await window.SASync.sincronizar();
+            }
+            registrar(
+              "la cola se drena y envía el reporte",
+              resultado.enviados === 1,
+              "enviados: " + resultado.enviados + ", errores: " + resultado.errores
+            );
+
+            const despues = await combatesPropios(yo.datos.id);
+            registrar(
+              "el combate llega al servidor exactamente una vez",
+              despues.length === 1,
+              "combates en el servidor: " + despues.length
+            );
+
+            // 5) Reenvío con la misma clave: el servidor responde 200 y no
+            //    crea otro combate (idempotencia).
+            const repetido = await fetch("/combats", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Accept: "application/json" },
+              credentials: "same-origin",
+              body: JSON.stringify(
+                Object.assign({}, cuerpo, { client_request_id: clave })
+              ),
+            });
+            registrar(
+              "el reenvío con la misma clave responde 200",
+              repetido.status === 200,
+              "HTTP " + repetido.status
+            );
+
+            const finales = await combatesPropios(yo.datos.id);
+            registrar(
+              "tras el reenvío sigue habiendo un solo combate",
+              finales.length === 1,
+              "combates en el servidor: " + finales.length
+            );
+
+            // 6) El ítem de la cola queda marcado como enviado.
+            const items = await window.SAOutbox.listar();
+            const mio = items.filter((i) => i.client_request_id === clave)[0];
+            registrar(
+              "el ítem de la cola queda como enviado",
+              mio && mio.estado === "enviado" && mio.combat_id,
+              mio ? mio.estado + " / combate " + mio.combat_id : "sin ítem"
+            );
+          } catch (error) {
+            registrar("excepción durante la prueba", false, String(error));
+          }
+
+          salida.textContent = JSON.stringify(pasos);
+          document.title = pasos.every((p) => p.ok) ? "TODO-OK" : "HAY-FALLOS";
+        }
+
+        if (document.readyState === "complete") {
+          ejecutar();
+        } else {
+          window.addEventListener("load", ejecutar);
+        }
+      })();
+    </script>
+  </body>
+</html>

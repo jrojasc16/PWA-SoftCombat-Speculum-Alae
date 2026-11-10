@@ -16,3 +16,6 @@ documentation/PROPUESTA_NUEVO_STACK.md
 # IA
 AGENTS.md
 .~lock.*#
+
+# Página de prueba temporal del verificador de navegador (Sprint 9)
+prototype/app/static/harness-prueba-offline.html
