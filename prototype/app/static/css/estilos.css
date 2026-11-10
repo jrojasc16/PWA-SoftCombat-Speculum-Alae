@@ -427,3 +427,14 @@ h1 {
   margin-top: 0;
   font-size: 1.1rem;
 }
+
+.admin-tarjeta select,
+.admin-tarjeta input {
+  max-width: 22rem;
+}
+
+button[disabled],
+select[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

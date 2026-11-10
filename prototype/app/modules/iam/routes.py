@@ -14,8 +14,9 @@ from flask_login import current_user, login_required, login_user, logout_user
 from app.extensions import login_manager
 from app.modules.iam import services
 from app.modules.iam.repositories import UserRepository
-from app.shared.decorators import api_login_required
-from app.shared.errors import AuthError
+from app.shared.decorators import api_login_required, role_required
+from app.shared.errors import AuthError, DomainError
+from app.shared.http import payload_json_o_formulario
 
 bp = Blueprint("iam", __name__)
 
@@ -95,3 +96,64 @@ def mi_comunidad():
     nombre → id sin publicar correos. Pide sesión (401 en caso contrario).
     """
     return jsonify(services.comunidad_de(current_user)), 200
+
+
+@bp.get("/admin/users")
+@api_login_required
+@role_required("admin", "super_admin")
+def listar_usuarios_admin():
+    """Usuarios de mi comunidad para el panel de administración (UC10).
+
+    - ``200``: lista de usuarios (incluye los desactivados).
+    - ``401``: sin sesión. ``403``: rol insuficiente.
+    """
+    incluir_inactivos = request.args.get("incluir_inactivos", "1") != "0"
+    usuarios = services.listar_usuarios_para_admin(current_user.id, incluir_inactivos)
+    return jsonify(usuarios), 200
+
+
+@bp.route("/admin/users/<int:user_id>", methods=["PATCH", "POST"])
+@api_login_required
+@role_required("admin", "super_admin")
+def actualizar_usuario_admin(user_id: int):
+    """Activa/desactiva una cuenta o le cambia el rol (UC10/UC11).
+
+    Acepta ``PATCH`` (API/PWA) y ``POST`` (formulario web, que no puede enviar
+    PATCH por sí mismo). Campos admitidos: ``active`` (booleano) y ``role``
+    (nombre del rol). Los campos que empiezan por ``_`` (metadatos del
+    formulario) se ignoran.
+    """
+    data = {
+        campo: valor
+        for campo, valor in payload_json_o_formulario().items()
+        if not campo.startswith("_")
+    }
+    admin_id = current_user.id
+    if "active" in data:
+        usuario = services.cambiar_estado_usuario(
+            admin_id, user_id, _booleano(data["active"])
+        )
+    elif "role" in data:
+        usuario = services.cambiar_rol_usuario(admin_id, user_id, data["role"])
+    else:
+        raise DomainError(
+            "Indica 'active' para activar/desactivar la cuenta o 'role' para "
+            "cambiar el rol del usuario."
+        )
+    return jsonify(usuario), 200
+
+
+def _booleano(valor) -> bool:
+    """Interpreta un valor de formulario o JSON como booleano.
+
+    Acepta ``True``/``False`` (JSON), ``"true"/"false"``, ``"1"/"0"`` y
+    ``"on"/"off"`` (lo que manda un ``<input type="checkbox">``).
+    """
+    if isinstance(valor, bool):
+        return valor
+    texto = str(valor).strip().lower()
+    if texto in ("true", "1", "on", "yes", "sí"):
+        return True
+    if texto in ("false", "0", "off", "no"):
+        return False
+    raise DomainError("El campo 'active' debe ser un valor booleano.")

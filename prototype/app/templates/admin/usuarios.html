@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block titulo %}Usuarios — Panel de administración{% endblock %}
+
+{% block contenido %}
+<section>
+  <h1>Usuarios de la comunidad</h1>
+  <p class="ayuda">
+    Activa o desactiva cuentas y cambia su rol. Cada cambio queda reflejado
+    de inmediato: una cuenta desactivada ya no puede iniciar sesión.
+  </p>
+
+  {% if error %}
+  <p class="mensaje mensaje-error" role="alert">{{ error }}</p>
+  {% endif %}
+
+  <p id="estado-usuarios" class="mensaje" role="status" hidden></p>
+
+  <noscript>
+    <p class="mensaje mensaje-error">
+      Esta página necesita JavaScript activo para aplicar los cambios.
+    </p>
+  </noscript>
+
+  <div class="tarjeta">
+    <div class="tabla-envoltura">
+      {% if miembros %}
+      <table class="tabla">
+        <caption class="vacio" style="text-align: left; padding: 0 0 0.5rem">
+          {{ total }} usuario{{ "s" if total != 1 }} en la comunidad
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Nombre</th>
+            <th scope="col">Correo</th>
+            <th scope="col">Rol</th>
+            <th scope="col">Estado</th>
+            <th scope="col">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for miembro in miembros %}
+          <tr data-usuario-id="{{ miembro.id }}">
+            <td>
+              {{ miembro.name }}
+              {% if miembro.id == usuario.id %}
+              <span class="etiqueta">(tú)</span>
+              {% endif %}
+            </td>
+            <td>{{ miembro.email }}</td>
+            <td>
+              <select
+                class="selector-rol"
+                aria-label="Rol de {{ miembro.name }}"
+                {% if miembro.id == usuario.id %}disabled{% endif %}
+              >
+                <option value="jugador" {% if miembro.role == "jugador" %}selected{% endif %}>Jugador</option>
+                <option value="arbitro" {% if miembro.role == "arbitro" %}selected{% endif %}>Árbitro</option>
+                <option value="admin" {% if miembro.role == "admin" %}selected{% endif %}>Administrador</option>
+                <option value="super_admin" {% if miembro.role == "super_admin" %}selected{% endif %}>Super administrador</option>
+              </select>
+            </td>
+            <td>
+              <span class="etiqueta {{ 'etiqueta-confirmado' if miembro.active else 'etiqueta-error' }}">
+                {{ "Activo" if miembro.active else "Inactivo" }}
+              </span>
+            </td>
+            <td>
+              <div class="acciones-fila">
+                <button
+                  type="button"
+                  class="boton-secundario btn-estado"
+                  data-id="{{ miembro.id }}"
+                  data-activo="{{ '1' if miembro.active else '0' }}"
+                  {% if miembro.id == usuario.id %}disabled{% endif %}
+                >
+                  {{ "Desactivar" if miembro.active else "Activar" }}
+                </button>
+                <button
+                  type="button"
+                  class="boton-secundario btn-rol"
+                  data-id="{{ miembro.id }}"
+                  {% if miembro.id == usuario.id %}disabled{% endif %}
+                >
+                  Guardar rol
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="vacio">Todavía no hay usuarios en esta comunidad.</p>
+      {% endif %}
+    </div>
+
+    <nav class="paginacion" aria-label="Paginación de usuarios">
+      {% if hay_anterior %}
+      <a
+        class="boton-secundario"
+        href="{{ url_for('ui.admin_usuarios', page=pagina_actual - 1) }}"
+        >← Anterior</a
+      >
+      {% else %}
+      <span></span>
+      {% endif %}
+
+      <span>Página {{ pagina_actual }} de {{ total_paginas }}</span>
+
+      {% if hay_siguiente %}
+      <a
+        class="boton-secundario"
+        href="{{ url_for('ui.admin_usuarios', page=pagina_actual + 1) }}"
+        >Siguiente →</a
+      >
+      {% else %}
+      <span></span>
+      {% endif %}
+    </nav>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/admin.js') }}" defer></script>
+{% endblock %}

@@ -30,15 +30,23 @@ class UserRepository:
         )
 
     @staticmethod
-    def listar_por_comunidad(community_id: int) -> list[User]:
-        """Usuarios activos de una comunidad (directorio para los formularios).
+    def listar_por_comunidad(
+        community_id: int, incluir_inactivos: bool = False
+    ) -> list[User]:
+        """Usuarios de una comunidad (directorio para los formularios).
+
+        Por defecto solo devuelve los usuarios **activos** (el directorio que
+        ven los jugadores). El panel de administración (Sprint 10) pide
+        ``incluir_inactivos=True`` para poder listar también las cuentas
+        suspendidas y reactivarlas.
 
         El rol se precarga para no disparar N+1 al montar el directorio.
         """
+        consulta = db.select(User).where(User.community_id == community_id)
+        if not incluir_inactivos:
+            consulta = consulta.where(User.active.is_(True))
         consulta = (
-            db.select(User)
-            .where(User.community_id == community_id, User.active.is_(True))
-            .options(selectinload(User.role))
+            consulta.options(selectinload(User.role))
             .order_by(User.name.asc(), User.id.asc())
         )
         return list(db.session.execute(consulta).scalars().all())
@@ -76,4 +84,11 @@ class RoleRepository:
             db.session.execute(db.select(Role).filter_by(name=name))
             .scalars()
             .first()
+        )
+
+    @staticmethod
+    def listar() -> list[Role]:
+        """Todos los roles del sistema en orden de id (panel de administración)."""
+        return list(
+            db.session.execute(db.select(Role).order_by(Role.id)).scalars().all()
         )

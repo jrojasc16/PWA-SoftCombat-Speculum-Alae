@@ -259,6 +259,9 @@ def salir():
 # para que nunca se confundan dos rutas que solo difieren en el idioma.
 PREFIJO_PANEL = "/admin/panel"
 
+# Filas por página de las tablas del panel (usuarios y combates).
+FILAS_ADMIN = 25
+
 
 @bp.get("/admin")
 @role_required_html("admin", "super_admin")
@@ -268,4 +271,40 @@ def admin_panel():
     Protegida por ``@role_required_html``: sin sesión redirige al login y con
     rol insuficiente devuelve la página de "sin permisos" (403).
     """
-    return render_template("admin/panel.html")
+    return render_template(
+        "admin/panel.html",
+        total_usuarios=len(
+            iam_services.listar_usuarios_para_admin(current_user.id)
+        ),
+    )
+
+
+@bp.get(f"{PREFIJO_PANEL}/usuarios")
+@role_required_html("admin", "super_admin")
+def admin_usuarios():
+    """Gestión de usuarios: listado con activar/desactivar y cambiar rol (UC10/UC11).
+
+    El listado lo pinta el servidor (misma fuente que ``GET /admin/users``) y
+    las acciones se envían por la API JSON desde ``js/admin.js``.
+    """
+    error = None
+    page = 1
+    try:
+        page = param_entero("page", request.args.get("page"), 1, 1)
+    except DomainError as exc:
+        error = exc.message
+
+    usuarios = iam_services.listar_usuarios_para_admin(current_user.id)
+    total = len(usuarios)
+    inicio = (page - 1) * FILAS_ADMIN
+    total_paginas = max(1, -(-total // FILAS_ADMIN))
+    return render_template(
+        "admin/usuarios.html",
+        miembros=usuarios[inicio : inicio + FILAS_ADMIN],
+        total=total,
+        pagina_actual=page,
+        total_paginas=total_paginas,
+        hay_anterior=page > 1,
+        hay_siguiente=page < total_paginas,
+        error=error,
+    )

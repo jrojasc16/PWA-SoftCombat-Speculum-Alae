@@ -10,6 +10,10 @@
     conflicto y recálculo del ranking.
   </p>
 
+  <div class="acciones">
+    <a class="boton" href="{{ url_for('ui.admin_usuarios') }}">Usuarios</a>
+  </div>
+
   <div class="tarjeta admin-tarjeta">
     <h2>Secciones del panel</h2>
     <div class="tabla-envoltura">
@@ -22,7 +26,9 @@
         </thead>
         <tbody>
           <tr>
-            <td>Usuarios</td>
+            <td>
+              <a href="{{ url_for('ui.admin_usuarios') }}">Usuarios</a>
+            </td>
             <td>
               Listar las cuentas de la comunidad, activar o desactivar cuentas y
               cambiar su rol.
