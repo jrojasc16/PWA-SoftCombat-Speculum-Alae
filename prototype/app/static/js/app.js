@@ -144,8 +144,13 @@
   function purgarCacheAlSalir() {
     if (!enlaceSalir) return;
     enlaceSalir.addEventListener("click", () => {
-      if (!navigator.serviceWorker || !navigator.serviceWorker.controller) return;
-      navigator.serviceWorker.controller.postMessage({ tipo: "sa-limpiar-cache" });
+      if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({ tipo: "sa-limpiar-cache" });
+      }
+      // El directorio local de la comunidad también es información personal.
+      if (window.SAOutbox && window.SAOutbox.disponible()) {
+        window.SAOutbox.borrarDirectorio().catch(() => null);
+      }
     });
   }
 
@@ -162,6 +167,14 @@
       }
     });
   }
+
+  // Tras sincronizar la cola offline, los datos mostrados se refrescan.
+  document.addEventListener("sa-outbox-cambio", (evento) => {
+    const detalle = (evento && evento.detail) || {};
+    if (detalle.tipo === "enviado" || detalle.tipo === "fin") {
+      actualizarDatos();
+    }
+  });
 
   registrarServiceWorker();
   purgarCacheAlSalir();

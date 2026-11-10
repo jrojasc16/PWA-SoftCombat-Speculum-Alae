@@ -94,3 +94,74 @@ def test_db_js_guarda_el_directorio_para_poder_reportar_sin_conexion(client):
     assert 'STORE_DIRECTORIO = "directorio"' in js
     assert "guardarDirectorio" in js
     assert "leerDirectorio" in js
+
+
+# ---------------------------------------------------------------------------
+# 9.2 — Encolar sin red y drenar la cola con reintento y backoff
+# ---------------------------------------------------------------------------
+
+
+def test_sync_js_se_sirve_y_expone_la_api(client):
+    r = client.get("/static/js/sync.js")
+    assert r.status_code == 200
+    assert "javascript" in r.content_type
+    js = r.get_data(as_text=True)
+    assert "SASync" in js
+    assert "sincronizar" in js
+
+
+def test_sync_js_se_activa_al_evento_online_y_al_abrir_la_app(client):
+    js = client.get("/static/js/sync.js").get_data(as_text=True)
+    assert 'addEventListener("online"' in js
+    assert 'addEventListener("load"' in js
+
+
+def test_sync_js_drena_la_cola_enviando_a_post_combats(client):
+    js = client.get("/static/js/sync.js").get_data(as_text=True)
+    assert 'const RUTA_REPORTE = "/combats"' in js
+    assert 'method: "POST"' in js
+    assert "client_request_id" in js
+
+
+def test_sync_js_usa_backoff_exponencial_y_respeta_el_orden_fifo(client):
+    js = client.get("/static/js/sync.js").get_data(as_text=True)
+    assert "Math.pow(2" in js
+    assert "ESPERA_MAXIMA_MS" in js
+    # Al fallar un envío reintentable se detiene el drenaje (orden FIFO).
+    assert "break; // se conserva el orden FIFO de la cola" in js
+
+
+def test_sync_js_distingue_error_reintentable_de_error_definitivo(client):
+    js = client.get("/static/js/sync.js").get_data(as_text=True)
+    assert "reintentable" in js
+    assert "respuesta.status >= 400 && respuesta.status < 500" in js
+    assert 'estado: "error"' in js
+
+
+def test_reportar_js_encola_el_reporte_cuando_no_hay_red(client):
+    js = client.get("/static/js/reportar.js").get_data(as_text=True)
+    assert "encolarReporte" in js
+    assert "!navigator.onLine" in js
+    assert "SASync.encolar" in js
+    assert "quedó guardado y se enviará solo" in js
+
+
+def test_reportar_js_usa_el_directorio_guardado_cuando_no_hay_red(client):
+    js = client.get("/static/js/reportar.js").get_data(as_text=True)
+    assert "leerDirectorio" in js
+    assert "directorio guardado" in js
+
+
+def test_layout_carga_db_y_sync_antes_de_la_aplicacion(client):
+    html = client.get("/").get_data(as_text=True)
+    assert "db.js" in html
+    assert "js/sync.js" in html
+    assert html.index("db.js") < html.index("js/sync.js") < html.index("js/app.js")
+
+
+def test_al_cerrar_sesion_se_borra_el_directorio_local(client, jugador):
+    _login(client, jugador)
+    html = client.get("/").get_data(as_text=True)
+    assert 'id="enlace-salir"' in html
+    js = client.get("/static/js/app.js").get_data(as_text=True)
+    assert "borrarDirectorio" in js

@@ -1,9 +1,13 @@
-/* Página /reportar (Sprint 7.6): envía el reporte a POST /combats.
+/* Página /reportar (Sprint 7.6, Sprint 9.2): envía el reporte a POST /combats.
  *
  * El formulario usa el mismo contrato JSON que la API: los datalists se
  * llenan con el directorio de la comunidad (GET /me/community), el nombre se
  * resuelve a id en el cliente y el envío es un fetch con JSON. El combate
  * queda PENDIENTE hasta que el rival (o el árbitro) lo confirme (RF6).
+ *
+ * Si no hay red, el reporte **no se pierde**: se encola en la base de datos
+ * local (``outbox`` de ``db.js``) con su clave de idempotencia y se envía
+ * solo al recuperar la conexión (``js/sync.js``).
  */
 (function () {
   "use strict";
@@ -44,20 +48,75 @@
     return enlaces.length === 1 ? enlaces[0].id : null;
   }
 
+  /** Guarda el directorio en la base local para poder usarlo sin conexión. */
+  function guardarDirectorioLocal(datos) {
+    if (!window.SAOutbox || !window.SAOutbox.disponible()) return;
+    window.SAOutbox.guardarDirectorio(datos).catch(() => null);
+  }
+
+  /** Carga el directorio de la comunidad (con red o desde la copia local). */
   async function cargarDirectorio() {
-    const respuesta = await fetch("/me/community", {
-      headers: { Accept: "application/json" },
-    });
-    if (!respuesta.ok) {
-      mostrar("No se pudo cargar el directorio de la comunidad.", true);
+    try {
+      const respuesta = await fetch("/me/community", {
+        headers: { Accept: "application/json" },
+        credentials: "same-origin",
+      });
+      if (!respuesta.ok) throw new Error("directorio no disponible");
+      const datos = await respuesta.json();
+      yo = datos.yo;
+      jugadores = datos.jugadores;
+      arbitros = datos.arbitros;
+      llenarDatalist(listaJugadores, jugadores);
+      llenarDatalist(listaArbitros, arbitros);
+      guardarDirectorioLocal(datos);
       return;
+    } catch (error) {
+      // Sin red: se intenta con la copia guardada en el dispositivo.
+      let local = null;
+      if (window.SAOutbox && window.SAOutbox.disponible()) {
+        local = await window.SAOutbox.leerDirectorio().catch(() => null);
+      }
+      if (local) {
+        yo = local.yo;
+        jugadores = local.jugadores || [];
+        arbitros = local.arbitros || [];
+        llenarDatalist(listaJugadores, jugadores);
+        llenarDatalist(listaArbitros, arbitros);
+        mostrar(
+          "Sin conexión: se muestra el directorio guardado en este dispositivo.",
+          false
+        );
+        return;
+      }
+      mostrar("No se pudo cargar el directorio de la comunidad.", true);
     }
-    const datos = await respuesta.json();
-    yo = datos.yo;
-    jugadores = datos.jugadores;
-    arbitros = datos.arbitros;
-    llenarDatalist(listaJugadores, jugadores);
-    llenarDatalist(listaArbitros, arbitros);
+  }
+
+  /** Encola el reporte para enviarlo cuando vuelva la red. */
+  async function encolarReporte(cuerpo, resumen, clave) {
+    if (!window.SASync || !window.SAOutbox || !window.SAOutbox.disponible()) {
+      mostrar(
+        "Sin conexión y este navegador no permite guardar el reporte: inténtalo de nuevo cuando vuelva la red.",
+        true
+      );
+      return false;
+    }
+    try {
+      await window.SASync.encolar(cuerpo, {
+        autor_id: yo ? yo.id : null,
+        resumen: resumen,
+        client_request_id: clave,
+      });
+      mostrar(
+        "Sin conexión: el reporte quedó guardado y se enviará solo al recuperar la red.",
+        false
+      );
+      formulario.reset();
+      return true;
+    } catch (error) {
+      mostrar("No se pudo guardar el reporte para enviarlo más tarde.", true);
+      return false;
+    }
   }
 
   formulario.addEventListener("submit", async (evento) => {
@@ -90,6 +149,23 @@
     };
     if (idArbitro !== null) cuerpo.referee_id = idArbitro;
 
+    const resumen = {
+      oponente: campoOponente.value.trim(),
+      resultado: campoResultado.value === "yo" ? "Gané yo" : "Ganó el oponente",
+      jugado: cuerpo.played_at,
+    };
+
+    // La clave de idempotencia se genera **antes** de enviar: si la respuesta
+    // se pierde por un corte de red, el reintento usa la misma clave y el
+    // servidor no crea un combate duplicado (Sprint 4.5).
+    const clave = window.SASync ? window.SASync.nuevaClave() : null;
+
+    // Sin red no se intenta ni el envío: se encola directamente.
+    if (!navigator.onLine) {
+      await encolarReporte(cuerpo, resumen, clave);
+      return;
+    }
+
     try {
       const respuesta = await fetch("/combats", {
         method: "POST",
@@ -97,7 +173,10 @@
           "Content-Type": "application/json",
           Accept: "application/json",
         },
-        body: JSON.stringify(cuerpo),
+        credentials: "same-origin",
+        body: JSON.stringify(
+          Object.assign({}, cuerpo, { client_request_id: clave })
+        ),
       });
       const datos = await respuesta.json();
       if (respuesta.ok) {
@@ -110,7 +189,8 @@
         mostrar(datos.error || "No se pudo registrar el combate.", true);
       }
     } catch (_error) {
-      mostrar("Sin conexión: inténtalo de nuevo cuando vuelva la red.", true);
+      // La red se cayó durante el envío: el reporte no se pierde.
+      await encolarReporte(cuerpo, resumen, clave);
     }
   });
 
