@@ -153,3 +153,38 @@ def test_sw_precachea_app_shell(client):
     sw = client.get("/static/sw.js").get_data(as_text=True)
     assert '"/ranking"' in sw
     assert '"/static/css/estilos.css"' in sw
+
+
+# ---------------------------------------------------------------------------
+# Service worker: runtime cache stale-while-revalidate con marca de tiempo
+# ---------------------------------------------------------------------------
+
+
+def test_sw_cachea_ranking_e_historial_con_stale_while_revalidate(client):
+    sw = client.get("/static/sw.js").get_data(as_text=True)
+    assert '"/api/ranking"' in sw
+    assert '"/me/history"' in sw
+    assert "responderConSWR" in sw
+    # La copia cacheada se devuelve de inmediato y la red se revalida detrás.
+    assert "guardada" in sw and "desdeRed" in sw
+
+
+def test_sw_marca_el_tiempo_de_las_copias_cacheadas(client):
+    sw = client.get("/static/sw.js").get_data(as_text=True)
+    assert "X-SW-Cache-Time" in sw
+    assert "new Date().toISOString()" in sw
+
+
+def test_sw_permite_consultar_y_purgar_la_cache_desde_la_ui(client):
+    sw = client.get("/static/sw.js").get_data(as_text=True)
+    assert "sa-estado-cache" in sw
+    assert "sa-limpiar-cache" in sw
+    # Al cerrar sesión se borran las lecturas propias cacheadas.
+    assert 'pathname.startsWith("/me")' in sw
+
+
+def test_sw_ignora_el_ranking_en_la_estrategia_de_red_primero(client):
+    """El ranking usa SWR; no debe quedar en la rama network-first."""
+    sw = client.get("/static/sw.js").get_data(as_text=True)
+    rama_red = sw.split("Navegaciones y estáticos")[1]
+    assert 'url.pathname === "/api/ranking"' not in rama_red
