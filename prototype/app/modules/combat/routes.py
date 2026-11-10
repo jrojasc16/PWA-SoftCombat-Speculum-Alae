@@ -126,7 +126,12 @@ def editar_combate_admin(combat_id: int):
 @api_login_required
 @role_required("admin", "super_admin")
 def listar_combates_admin():
-    """Combates de mi comunidad para el panel admin (``?status=CONFLICTO``)."""
+    """Combates de mi comunidad para el panel admin (``?status=CONFLICTO``).
+
+    Usa la **misma** proyección que la vista HTML ``/admin/panel/combates``
+    (``combat.services.listar_combates_admin``), de modo que la API y la
+    página nunca puedan mostrar datos distintos.
+    """
     estado = request.args.get("status")
     if estado:
         try:
@@ -136,8 +141,8 @@ def listar_combates_admin():
                 f"Estado inválido '{estado}': use PENDIENTE, CONFIRMADO, "
                 "CONFLICTO o RESUELTO."
             ) from exc
-    combates = CombatRepository.listar_admin(current_user.community_id, estado)
-    return jsonify([_combat_json(c) for c in combates]), 200
+    combates = services.listar_combates_admin(current_user.community_id, estado)
+    return jsonify(combates), 200
 
 
 @bp.get("/admin/combats/<int:combat_id>/audit")

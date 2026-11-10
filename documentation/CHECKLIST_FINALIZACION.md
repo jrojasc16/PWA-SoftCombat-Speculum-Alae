@@ -62,7 +62,7 @@ Comando de verificación local: `cd prototype && ../venv/bin/python -m pytest -q
 - [x] **10.4** Botón “Recalcular ranking” → `POST /admin/ranking/recalculate` con confirmación previa y resultado (n.º de combates reprocesados) → commit `2472f48` (`window.confirm` + mensaje `#estado-recalculo`).
 - [x] **10.5** Tests de permisos en todas las rutas nuevas (401/403 por rol y comunidad) → commit `07d9df5` (`prototype/tests/test_admin_panel.py`, 34 tests).
 - [x] **10.6** Sprint marcado en el plan y commit por tarea → commit `Sprint 10, tarea 10.6` (este commit).
-- **Verificación del sprint:** el flujo completo (listar usuarios → desactivar/cambiar rol → listar conflictos → resolver con el ganador real → ver la bitácora → recalcular el ranking) funciona contra la API real. **354 tests en verde**, cobertura `app.modules.ranking` = 100 %.
+- [x] **Verificación del sprint** en navegador real (Microsoft Edge headless): `scripts/verificar_admin_browser.py` + `scripts/harness_admin.html` + CDP → 17 pasos OK (403 del jugador en la página y en la API, gestión de usuarios, auto-desactivación bloqueada, resolución de conflictos, bitácora con `winner_id` y `status`, recálculo del ranking). **357 tests en verde**, cobertura `app.modules.ranking` = 100 %.
 
 ---
 

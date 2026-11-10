@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>Prueba del panel de administración</title>
+  </head>
+  <body>
+    <h1>Prueba automática del panel de administración (Sprint 10)</h1>
+    <p>
+      Esta página la usa <code>scripts/verificar_admin_browser.py</code> con un
+      navegador sin interfaz. Simula el flujo «entrar como admin → gestionar
+      usuarios → resolver un conflicto → ver la bitácora → recalcular el
+      ranking» contra la API real y deja el resultado en el elemento
+      <code>#resultado</code>.
+    </p>
+    <pre id="resultado">PENDIENTE</pre>
+
+    <script>
+      (function () {
+        "use strict";
+
+        const salida = document.getElementById("resultado");
+        const pasos = [];
+
+        function registrar(nombre, condicion, detalle) {
+          pasos.push({
+            nombre: nombre,
+            ok: Boolean(condicion),
+            detalle: detalle === undefined ? "" : String(detalle),
+          });
+        }
+
+        function esperar(ms) {
+          return new Promise((resolver) => setTimeout(resolver, ms));
+        }
+
+        async function peticion(url, metodo, cuerpo) {
+          const opciones = {
+            method: metodo,
+            headers: { Accept: "application/json" },
+            credentials: "same-origin",
+          };
+          if (cuerpo !== undefined) {
+            opciones.headers["Content-Type"] = "application/json";
+            opciones.body = JSON.stringify(cuerpo);
+          }
+          const respuesta = await fetch(url, opciones);
+          let datos = null;
+          try {
+            datos = await respuesta.json();
+          } catch (error) {
+            datos = null;
+          }
+          return { estado: respuesta.status, datos: datos };
+        }
+
+        async function ejecutar() {
+          try {
+            const sufijo = Date.now().toString(36);
+
+            // 1) Un jugador de prueba se registra (sesión del jugador).
+            const registro = await peticion("/auth/register", "POST", {
+              email: "prueba-admin-" + sufijo + "@test.local",
+              password: "password123",
+              name: "Prueba Panel " + sufijo,
+            });
+            registrar("registro del jugador de prueba", registro.estado === 201, "HTTP " + registro.estado);
+
+            // 2) El jugador no puede entrar al panel: 403 en las páginas.
+            const paginaSinPermiso = await fetch("/admin", {
+              headers: { Accept: "text/html" },
+              credentials: "same-origin",
+            });
+            registrar(
+              "el panel devuelve 403 al jugador",
+              paginaSinPermiso.status === 403,
+              "HTTP " + paginaSinPermiso.status
+            );
+
+            // 3) La API admin devuelve 403 al jugador.
+            const apiSinPermiso = await peticion("/admin/users", "GET");
+            registrar(
+              "la API admin devuelve 403 al jugador",
+              apiSinPermiso.estado === 403,
+              "HTTP " + apiSinPermiso.estado
+            );
+
+            // 4) Entra el administrador de la semilla y lista su comunidad.
+            const login = await peticion("/auth/login", "POST", {
+              email: "admin@prueba.local",
+              password: "password123",
+            });
+            registrar("inicio de sesión del administrador", login.estado === 200, "HTTP " + login.estado);
+
+            const listado = await peticion("/admin/users", "GET");
+            registrar(
+              "el admin lista los usuarios de su comunidad",
+              listado.estado === 200 && Array.isArray(listado.datos) && listado.datos.length > 0,
+              "usuarios: " + (listado.datos ? listado.datos.length : 0)
+            );
+
+            // 5) Desactiva un usuario de la comunidad (menos el admin mismo).
+            const objetivo = (listado.datos || []).filter(
+              (u) => u.email.indexOf("prueba-admin-") === 0
+            )[0];
+            registrar("hay un usuario de prueba en el listado", Boolean(objetivo));
+
+            if (objetivo) {
+              const desactivado = await peticion("/admin/users/" + objetivo.id, "PATCH", {
+                active: false,
+              });
+              registrar(
+                "el admin desactiva una cuenta",
+                desactivado.estado === 200 && desactivado.datos.active === false,
+                "HTTP " + desactivado.estado
+              );
+
+              const reactivado = await peticion("/admin/users/" + objetivo.id, "PATCH", {
+                active: true,
+              });
+              registrar(
+                "el admin reactiva la cuenta",
+                reactivado.estado === 200 && reactivado.datos.active === true,
+                "HTTP " + reactivado.estado
+              );
+
+              const rol = await peticion("/admin/users/" + objetivo.id, "PATCH", {
+                role: "arbitro",
+              });
+              registrar(
+                "el admin cambia el rol",
+                rol.estado === 200 && rol.datos.role === "arbitro",
+                "HTTP " + rol.estado
+              );
+            }
+
+            // 6) El admin no puede desactivarse a sí mismo.
+            const propio = (listado.datos || []).filter(
+              (u) => u.email === "admin@prueba.local"
+            )[0];
+            if (propio) {
+              const auto = await peticion("/admin/users/" + propio.id, "PATCH", {
+                active: false,
+              });
+              registrar(
+                "el admin no puede desactivar su propia cuenta",
+                auto.estado === 403,
+                "HTTP " + auto.estado
+              );
+            }
+
+            // 7) Resuelve el combate en conflicto de la semilla.
+            const conflictos = await peticion("/admin/combats?status=CONFLICTO", "GET");
+            registrar(
+              "el admin lista los combates en conflicto",
+              conflictos.estado === 200 && Array.isArray(conflictos.datos),
+              "conflictos: " + (conflictos.datos ? conflictos.datos.length : 0)
+            );
+
+            const combate = (conflictos.datos || [])[0];
+            registrar("hay un combate en conflicto que resolver", Boolean(combate));
+
+            if (combate) {
+              // Se elige al participante que NO es el ganador ya declarado:
+              // así el cambio de `winner_id` queda registrado en la bitácora.
+              const ganador =
+                (combate.participants || []).filter(
+                  (p) => p.user_id !== combate.winner_id
+                )[0] || (combate.participants || [])[0];
+              const resuelto = await peticion("/admin/combats/" + combate.id, "PATCH", {
+                winner_id: ganador.user_id,
+              });
+              registrar(
+                "el admin resuelve el conflicto declarando el ganador",
+                resuelto.estado === 200 && resuelto.datos.status === "RESUELTO",
+                "HTTP " + resuelto.estado
+              );
+
+              const bitacora = await peticion("/admin/combats/" + combate.id + "/audit", "GET");
+              const campos = (bitacora.datos || []).map((e) => e.campo);
+              registrar(
+                "la bitácora muestra los campos modificados",
+                bitacora.estado === 200 && campos.indexOf("winner_id") !== -1,
+                "campos: " + campos.join(", ")
+              );
+
+              const pagina = await fetch("/admin/panel/combates?estado=RESUELTO", {
+                headers: { Accept: "text/html" },
+                credentials: "same-origin",
+              });
+              const html = await pagina.text();
+              registrar(
+                "la página de combates muestra la bitácora",
+                pagina.status === 200 && html.indexOf("Bitácora de auditoría") !== -1,
+                "HTTP " + pagina.status
+              );
+            }
+
+            // 8) Recalcula el ranking (la operación es transaccional).
+            const recalculo = await peticion("/admin/ranking/recalculate", "POST", {});
+            registrar(
+              "el admin recalcula el ranking",
+              recalculo.estado === 200 &&
+                typeof recalculo.datos.combats_processed === "number",
+              "combates reprocesados: " +
+                (recalculo.datos ? recalculo.datos.combats_processed : "?")
+            );
+
+            // 9) La portada del panel carga con el botón de recálculo.
+            const portada = await fetch("/admin", {
+              headers: { Accept: "text/html" },
+              credentials: "same-origin",
+            });
+            const htmlPortada = await portada.text();
+            registrar(
+              "la portada del panel ofrece el recálculo",
+              portada.status === 200 &&
+                htmlPortada.indexOf('id="btn-recalcular"') !== -1,
+              "HTTP " + portada.status
+            );
+          } catch (error) {
+            registrar("excepción durante la prueba", false, String(error));
+          }
+
+          salida.textContent = JSON.stringify(pasos);
+          document.title = pasos.every((p) => p.ok) ? "TODO-OK" : "HAY-FALLOS";
+        }
+
+        if (document.readyState === "complete") {
+          ejecutar();
+        } else {
+          window.addEventListener("load", ejecutar);
+        }
+      })();
+    </script>
+  </body>
+</html>

@@ -4,7 +4,8 @@
 #
 # Uso:
 #   ./scripts/check.sh                 # solo tests y cobertura
-#   ./scripts/check.sh --con-navegador  # además verifica la cola offline en un
+#   ./scripts/check.sh --con-navegador  # además verifica la cola offline y el
+#                                       # panel de administración en un
 #                                       # navegador real (requiere la app en
 #                                       # marcha en http://127.0.0.1:5000)
 set -euo pipefail
@@ -25,6 +26,8 @@ cd ..
 if [ "${1:-}" = "--con-navegador" ]; then
   echo "Verificando la cola offline en un navegador real..."
   "$PY" scripts/verificar_offline_browser.py --url "${2:-http://127.0.0.1:5000}"
+  echo "Verificando el panel de administración en un navegador real..."
+  "$PY" scripts/verificar_admin_browser.py --url "${2:-http://127.0.0.1:5000}"
 fi
 
 echo "Chequeo OK."

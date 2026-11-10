@@ -512,3 +512,37 @@ def test_el_panel_no_se_cachea_en_el_service_worker():
         encoding="utf-8"
     )
     assert 'url.pathname.startsWith("/admin")' in sw
+
+
+def test_existen_las_herramientas_de_verificacion_en_navegador():
+    """El sprint se puede verificar en un navegador real (Sprint 10)."""
+    from pathlib import Path
+
+    raiz = Path(__file__).resolve().parents[2]
+    assert (raiz / "scripts" / "verificar_admin_browser.py").exists()
+    assert (raiz / "scripts" / "harness_admin.html").exists()
+    assert (raiz / "scripts" / "cdp_esperar_resultado.mjs").exists()
+
+
+def test_la_pagina_de_prueba_cubre_el_flujo_del_panel():
+    """La página de prueba recorre el flujo completo del panel."""
+    from pathlib import Path
+
+    raiz = Path(__file__).resolve().parents[2]
+    html = (raiz / "scripts" / "harness_admin.html").read_text(encoding="utf-8")
+    assert "/admin/users" in html
+    assert "/admin/combats" in html
+    assert "/admin/ranking/recalculate" in html
+    assert 'id="resultado"' in html
+
+
+def test_el_script_de_verificacion_usa_el_protocolo_devtools():
+    """El verificador del panel usa el mismo protocolo DevTools que el offline."""
+    from pathlib import Path
+
+    raiz = Path(__file__).resolve().parents[2]
+    script = (raiz / "scripts" / "verificar_admin_browser.py").read_text(
+        encoding="utf-8"
+    )
+    assert "cdp_esperar_resultado.mjs" in script
+    assert "--remote-debugging-port" in script
