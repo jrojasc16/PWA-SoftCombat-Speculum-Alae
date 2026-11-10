@@ -1,10 +1,11 @@
-/* Panel de administración (Sprint 10): gestión de usuarios y resolución de
- * conflictos.
+/* Panel de administración (Sprint 10): gestión de usuarios, resolución de
+ * conflictos y recálculo manual del ranking.
  *
  * Las acciones hablan con la **misma API JSON** que usa el resto de la PWA
  * (mismo origen, cookie de sesión):
- *   - PATCH /admin/users/<id>   → activar/desactivar y cambiar el rol
- *   - PATCH /admin/combats/<id> → editar el resultado (queda auditado)
+ *   - PATCH /admin/users/<id>          → activar/desactivar y cambiar el rol
+ *   - PATCH /admin/combats/<id>        → editar el resultado (queda auditado)
+ *   - POST  /admin/ranking/recalculate → reconstruir los índices
  *
  * El service worker nunca cachea /admin: estas páginas siempre van a la red.
  */
@@ -13,10 +14,12 @@
 
   const estadoUsuarios = document.getElementById("estado-usuarios");
   const estadoCombates = document.getElementById("estado-combates");
+  const estadoRecalculo = document.getElementById("estado-recalculo");
+  const botonRecalcular = document.getElementById("btn-recalcular");
   const tablaUsuarios = document.querySelector("table.tabla");
   const listaCombates = document.getElementById("lista-combates");
 
-  if (!estadoUsuarios && !estadoCombates) return;
+  if (!estadoUsuarios && !estadoCombates && !estadoRecalculo) return;
 
   function mostrar(elemento, texto, esError) {
     if (!elemento) return;
@@ -134,6 +137,37 @@
         .catch((error) => {
           mostrar(estadoCombates, error.message, true);
           boton.disabled = false;
+        });
+    });
+  }
+
+  // --- Recálculo manual del ranking (UC13) ---------------------------------
+
+  if (botonRecalcular) {
+    botonRecalcular.addEventListener("click", () => {
+      const confirmado = window.confirm(
+        "¿Recalcular todo el ranking de la comunidad?\n\n" +
+          "Se reconstruyen los índices replayando todos los combates cerrados. " +
+          "La operación es transaccional: si falla, no queda nada a medias."
+      );
+      if (!confirmado) return;
+
+      botonRecalcular.disabled = true;
+      enviar(botonRecalcular.dataset.url, "POST", {})
+        .then((datos) => {
+          mostrar(
+            estadoRecalculo,
+            "Ranking recalculado: " +
+              datos.combats_processed +
+              " combate(s) reprocesados.",
+            false
+          );
+        })
+        .catch((error) => {
+          mostrar(estadoRecalculo, error.message, true);
+        })
+        .finally(() => {
+          botonRecalcular.disabled = false;
         });
     });
   }

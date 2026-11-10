@@ -15,45 +15,69 @@
     <a class="boton" href="{{ url_for('ui.admin_combates') }}">Combates</a>
   </div>
 
-  <div class="tarjeta admin-tarjeta">
-    <h2>Secciones del panel</h2>
+  <div class="tarjeta">
+    <h2>Resumen</h2>
     <div class="tabla-envoltura">
       <table class="tabla">
         <thead>
           <tr>
             <th scope="col">Sección</th>
-            <th scope="col">Qué permite</th>
+            <th scope="col">Pendientes</th>
+            <th scope="col">Acción</th>
           </tr>
         </thead>
         <tbody>
           <tr>
+            <td>Usuarios de la comunidad</td>
+            <td>{{ total_usuarios }}</td>
             <td>
-              <a href="{{ url_for('ui.admin_usuarios') }}">Usuarios</a>
-            </td>
-            <td>
-              Listar las cuentas de la comunidad, activar o desactivar cuentas y
-              cambiar su rol.
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <a href="{{ url_for('ui.admin_combates') }}">Combates en conflicto</a>
-            </td>
-            <td>
-              Revisar los combates en conflicto, declarar el resultado real y
-              consultar la bitácora de auditoría.
+              <a
+                class="boton-secundario"
+                href="{{ url_for('ui.admin_usuarios') }}"
+                >Gestionar</a
+              >
             </td>
           </tr>
           <tr>
-            <td>Recálculo del ranking</td>
+            <td>Combates en conflicto</td>
+            <td>{{ total_conflictos }}</td>
             <td>
-              Reconstruir los índices de la comunidad replayando todos sus
-              combates cerrados, en orden cronológico.
+              <a
+                class="boton-secundario"
+                href="{{ url_for('ui.admin_combates') }}"
+                >Resolver</a
+              >
+            </td>
+          </tr>
+          <tr>
+            <td>Recálculo manual del ranking</td>
+            <td>—</td>
+            <td>
+              <button
+                type="button"
+                id="btn-recalcular"
+                class="boton-secundario"
+                data-url="{{ url_for('ranking.recalcular_ranking') }}"
+              >
+                Recalcular ranking
+              </button>
             </td>
           </tr>
         </tbody>
       </table>
     </div>
+
+    <p id="estado-recalculo" class="mensaje" role="status" hidden></p>
+
+    <p class="ayuda">
+      El recálculo reconstruye los índices de tu comunidad replayando todos sus
+      combates cerrados, en orden cronológico. Es la vía manual del RNF008 y
+      deja el ranking igual que lo calcularía el cierre de cada combate.
+    </p>
   </div>
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/admin.js') }}" defer></script>
 {% endblock %}
