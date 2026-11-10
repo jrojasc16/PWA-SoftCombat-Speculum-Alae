@@ -54,14 +54,15 @@ Comando de verificación local: `cd prototype && ../venv/bin/python -m pytest -q
 
 ---
 
-## Sprint 10 — Panel de administración completo
+## Sprint 10 — Panel de administración completo — **COMPLETADO**
 
-- [ ] **10.1** Vista `/admin` protegida por rol, con menú: usuarios, combates en conflicto, recálculo.
-- [ ] **10.2** Gestión de usuarios: listar, activar/desactivar, cambiar rol (`admin`/`super_admin` únicamente) → **requiere endpoints nuevos** (hoy no existen rutas admin de usuarios).
-- [ ] **10.3** Lista de combates `CONFLICTO` con formulario de edición → `PATCH /admin/combats/<id>` y visualización del `AuditLog` por combate.
-- [ ] **10.4** Botón “Recalcular ranking” → `POST /admin/ranking/recalculate` con confirmación previa y resultado (n.º de combates reprocesados).
-- [ ] **10.5** Tests de permisos en todas las rutas nuevas (401/403 por rol y comunidad).
-- [ ] **10.6** Marcar el sprint en el plan y commitear tarea por tarea.
+- [x] **10.1** Vista `/admin` protegida por rol, con menú: usuarios, combates en conflicto, recálculo → commit `3437e32` (`role_required_html` en `app/shared/decorators.py`: 302 sin sesión, 403 con rol insuficiente; `admin/panel.html`; enlace «Admin» solo para `admin`/`super_admin`).
+- [x] **10.2** Gestión de usuarios: listar, activar/desactivar, cambiar rol (`admin`/`super_admin` únicamente) → commit `a019e26` (API nueva `GET /admin/users` y `PATCH|POST /admin/users/<id>`; página `/admin/panel/usuarios`; aislamiento por comunidad RNF006; sin auto-desactivación ni auto-cambio de rol; solo `super_admin` concede `super_admin`).
+- [x] **10.3** Lista de combates `CONFLICTO` con formulario de edición → `PATCH /admin/combats/<id>` y visualización del `AuditLog` por combate → commit `d7245fd` (página `/admin/panel/combates` con filtro por estado; endpoint nuevo `GET /admin/combats/<id>/audit`; la bitácora también aísla por comunidad).
+- [x] **10.4** Botón “Recalcular ranking” → `POST /admin/ranking/recalculate` con confirmación previa y resultado (n.º de combates reprocesados) → commit `2472f48` (`window.confirm` + mensaje `#estado-recalculo`).
+- [x] **10.5** Tests de permisos en todas las rutas nuevas (401/403 por rol y comunidad) → commit `07d9df5` (`prototype/tests/test_admin_panel.py`, 34 tests).
+- [x] **10.6** Sprint marcado en el plan y commit por tarea → commit `Sprint 10, tarea 10.6` (este commit).
+- **Verificación del sprint:** el flujo completo (listar usuarios → desactivar/cambiar rol → listar conflictos → resolver con el ganador real → ver la bitácora → recalcular el ranking) funciona contra la API real. **354 tests en verde**, cobertura `app.modules.ranking` = 100 %.
 
 ---
 
@@ -128,8 +129,8 @@ Comando de verificación local: `cd prototype && ../venv/bin/python -m pytest -q
 
 ## Riesgos / puntos de atención
 
-1. **Rama sin remoto**: hasta que se haga `git push -u origin desarrollo-sprint-7`, todo el trabajo (30+ commits) existe solo en local.
+1. **Rama sin remoto**: hasta que se haga `git push -u origin desarrollo-sprint-7`, todo el trabajo (50+ commits) existe solo en local.
 2. **PNG de diagramas inexistentes**: bloquea el 13.4; requiere PlantUML (Java) o Graphviz para exportar `.puml`.
-3. **Endpoints admin de usuarios inexistentes**: el Sprint 10.2 necesita API nueva, no solo UI.
+3. ~~**Endpoints admin de usuarios inexistentes**~~ — **resuelto en el Sprint 10.2** (API nueva `GET /admin/users` y `PATCH|POST /admin/users/<id>`, commit `a019e26`).
 4. **RNF003 / RNF005** están definidos en `PROPUESTA_NUEVO_STACK.md` §7 (no inventar requisitos; consultar al supervisor si hay dudas).
 5. **Rendimiento del ranking** en SQLite con 100 usuarios: validar en el Sprint 12.5 antes del despliegue real.
