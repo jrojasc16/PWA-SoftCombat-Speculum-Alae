@@ -1,0 +1,134 @@
+# Checklist de finalización del proyecto — Speculum-Alae Ranking App
+
+**Fecha de corte:** 2026-11-09 · **Rama de trabajo:** `desarrollo-sprint-7` · **Plan maestro:** `documentation/PLAN_DESARROLLO_PROTOTIPO.md`
+
+---
+
+## 0. Estado actual (verificado)
+
+| Ítem | Estado |
+|---|---|
+| Sprints 1–7 | Completados y marcados en el plan (272 tests en verde, cobertura `app.modules.ranking` = 100 %) |
+| Sprint 8 | **Completado** (commits `6a1c2ad`, `92b371e`, `48fcd60`, `580b7ff`, `2d10c3a`): manifest + iconos, SW stale-while-revalidate con marca de tiempo, indicador offline, verificador de instalabilidad, pruebas manuales documentadas. La ejecución con navegador real (instalación y modo avión) queda pendiente para el equipo |
+| Working tree | Limpio salvo este documento de trabajo (`documentation/CHECKLIST_FINALIZACION.md`) |
+| Push al remoto | **Pendiente** — la rama `desarrollo-sprint-7` no existe en `origin` (35 commits locales) |
+| Entregables "stub" | `prototype/docs/openapi.yaml` (1 línea), `prototype/wordpress-plugin/ranking-table.php` (5 líneas), `prototype/app/static/db.js` (6 líneas) |
+| Diagramas | Fuentes `.puml`/`.mmd` existentes, **sin PNG exportados** (requerido por 18 espacios reservados del `.docx` v2) |
+| Documentación | `.docx` v2 redactado; faltan las figuras PNG |
+| Código | Todo vive en `prototype/`; `code/` sigue reservado (vacío) |
+
+Comando de verificación local: `cd prototype && ../venv/bin/python -m pytest -q` (o `scripts/check.sh`).
+
+---
+
+## Bloque 0 — Cierres administrativos inmediatos (antes de seguir)
+
+- [ ] **0.1** ~~Commitear el trabajo parcial del Sprint 8~~ — **hecho** (commits `6a1c2ad` … `2d10c3a`).
+- [ ] **0.2** Ejecutar `git push -u origin desarrollo-sprint-7` (lo ejecuta el usuario con sus credenciales; este entorno no tiene acceso a GitHub).
+- [ ] **0.3** Verificar con `git status -sb` que la rama queda siguiendo el remoto y sin cambios pendientes.
+- [ ] **0.4** Decidir el destino de `code/` (vacío): eliminarlo o dejar constancia en el README de que el código vive en `prototype/`.
+- [ ] **0.5** Confirmar con el supervisor la transición de stack aprobada (Flask + SQLite + PWA) antes del cierre del Sprint 14, ya que el `.docx` v1.0 sigue siendo la referencia histórica.
+
+---
+
+## Sprint 8 — PWA: manifest, service worker y lectura offline — **COMPLETADO**
+
+- [x] **8.1** `manifest.json` con nombre, iconos 192/512, `start_url`, `display: standalone`, colores → commit `6a1c2ad` (iconos generados con `scripts/generar_iconos_pwa.py`, favicon/apple-touch-icon, `theme-color`, paleta CSS, tests del manifest y de los PNG).
+- [x] **8.2** `static/sw.js`: app-shell (precache de layout/CSS/JS) + runtime cache del ranking e historial propio con marca de tiempo y estrategia *stale-while-revalidate* → commit `92b371e` (SWR de `/api/ranking` y `/me/history`, cabecera `X-SW-Cache-Time`, mensajes `sa-cache-actualizada`, `sa-estado-cache`, `sa-limpiar-cache`, `sa-datos-cache`).
+- [x] **8.3** Registro del SW desde el layout; indicador visual de “modo offline / datos de las HH:MM” → commit `48fcd60` (banner `#aviso-offline`, marca `#marca-datos`, listeners `online`/`offline`, purga al cerrar sesión, página pública `/offline`).
+- [x] **8.4** Verificar instalabilidad (Lighthouse: installable en Android y escritorio; RNF005: Chrome/Firefox/Edge/Safari, 2 últimas versiones) → commit `580b7ff` (`scripts/verificar_pwa.py`, test en CI con servidor efímero, informe `documentation/PWA_VERIFICACION_INSTALABILIDAD.md`; la medición con Lighthouse queda como paso manual documentado).
+- [x] **8.5** Pruebas manuales documentadas: cargar ranking online → bajar a modo avión → recargar → se muestra la copia cacheada → commit `2d10c3a` (`documentation/PRUEBAS_MANUALES_PWA.md`, 8 casos + registro de ejecución).
+- [ ] **Pendiente del equipo (no automatizable aquí):** ejecutar los 8 casos manuales con navegador y llenar la tabla de registro de `documentation/PRUEBAS_MANUALES_PWA.md`.
+
+---
+
+## Sprint 9 — Outbox offline (IndexedDB) y sincronización
+
+- [ ] **9.1** `static/db.js`: wrapper mínimo de IndexedDB con store `outbox` (payload + `client_request_id` + timestamp) — hoy es solo un comentario placeholder (`prototype/app/static/db.js`).
+- [ ] **9.2** Al reportar sin conexión → encolar; al recuperar red (evento `online` + al abrir la app) → drenar la cola **en orden**, con reintento y backoff exponencial.
+- [ ] **9.3** Reutilizar `client_request_id` (Sprint 4.5) para que el servidor descarte duplicados sin error visible (respuesta 200 idempotente ya existente).
+- [ ] **9.4** UI: listado de “reportes pendientes de envío” con estado por ítem (en `/reportar` o vista propia).
+- [ ] **9.5** Actualizar `secuencia_02_offline_sync.{puml,mmd}` (y re-exportar PNG) si el flujo difiere del diagrama.
+- [ ] **9.6** Tests JS (o test de integración del endpoint de idempotencia) y prueba manual modo avión → reconectar → llega una sola vez.
+
+---
+
+## Sprint 10 — Panel de administración completo
+
+- [ ] **10.1** Vista `/admin` protegida por rol, con menú: usuarios, combates en conflicto, recálculo.
+- [ ] **10.2** Gestión de usuarios: listar, activar/desactivar, cambiar rol (`admin`/`super_admin` únicamente) → **requiere endpoints nuevos** (hoy no existen rutas admin de usuarios).
+- [ ] **10.3** Lista de combates `CONFLICTO` con formulario de edición → `PATCH /admin/combats/<id>` y visualización del `AuditLog` por combate.
+- [ ] **10.4** Botón “Recalcular ranking” → `POST /admin/ranking/recalculate` con confirmación previa y resultado (n.º de combates reprocesados).
+- [ ] **10.5** Tests de permisos en todas las rutas nuevas (401/403 por rol y comunidad).
+- [ ] **10.6** Marcar el sprint en el plan y commitear tarea por tarea.
+
+---
+
+## Sprint 11 — Plugin WordPress + shortcode `[ranking_table]`
+
+- [ ] **11.1** `prototype/wordpress-plugin/ranking-table.php`: cabecera de plugin, registro del shortcode, consumo de `GET /api/ranking` con la HTTP API de WP (hoy el archivo solo tiene el docblock).
+- [ ] **11.2** Caché con **Transients** (TTL ≈ 5 min) y mensaje degradado si el backend no responde.
+- [ ] **11.3** Página de ajustes: URL base de la API + TTL.
+- [ ] **11.4** Escapado de toda salida (`esc_html`, `esc_attr`) y tabla HTML ordenada igual que la vista web.
+- [ ] **11.5** Prueba en un WordPress local/staging con datos reales del prototipo (y 11.6: apuntar el shortcode a producción en el Sprint 14).
+
+---
+
+## Sprint 12 — Pruebas integrales, carga y OpenAPI
+
+- [ ] **12.1** Completar `prototype/docs/openapi.yaml` (hoy es una línea de docstring) con **todos** los endpoints: auth, combates, confirmaciones, ranking público, admin, historial; esquemas y códigos de error.
+- [ ] **12.2** Validar el OpenAPI (linter/validador) y referenciarlo en el README.
+- [ ] **12.3** Suite de integración end-to-end: registro → reporte → confirmación dual → ranking actualizado → historial → endpoint público.
+- [ ] **12.4** Script de semilla de datos: 100 usuarios + N combates confirmados.
+- [ ] **12.5** Prueba de carga sobre `GET /api/ranking` (`locust`/`ab`): **p95 < 500 ms con 100 usuarios** (RNF002) y documentar resultados.
+- [ ] **12.6** Revisión de seguridad: bcrypt costo 12 efectivo, cookies `Secure`/`HttpOnly`, HTTPS forzado en producción, sin datos sensibles en respuestas públicas.
+- [ ] **12.7** Confirmar cobertura Elo ≥ 70 % (hoy 100 %) con `scripts/check.sh` y artefactos de CI.
+
+---
+
+## Sprint 13 — Documentación técnica y de usuario
+
+- [ ] **13.1** `prototype/README.md`: instalar, migrar (`flask db upgrade`), correr (`run.py`/`wsgi.py`), testear — en español.
+- [ ] **13.2** Guía de despliegue en PythonAnywhere: variables de entorno, `SECRET_KEY`, `wsgi.py`, dominio y HTTPS.
+- [ ] **13.3** Manual de usuario breve por rol (jugador, árbitro, admin) con capturas de pantalla.
+- [ ] **13.4** **Exportar los PNG de `documentation/diagrams/`** (hoy no existe ninguno) e insertarlos en los **18 espacios reservados** del `.docx` v2 (`documentation/Metodologia_Proyecto_Ingenieria_Software_Speculum_Alae_v2_PWA.docx`), revisando coherencia figura ↔ texto.
+- [ ] **13.5** Sincronizar `documentation/diagrams/clases.puml` **y** `.mmd` con la implementación real (`Confirmation.reported_result`, `AuditLog.campo/valor_anterior/valor_nuevo`) — pendiente declarado en `AGENTS.md`.
+- [ ] **13.6** Actualizar `AGENTS.md` (estado de sprints, superficie HTTP, ramas, estado del push).
+- [ ] **13.7** Manual de operación: renovación de cuenta, respaldos de SQLite, plan gratuito de PythonAnywhere.
+
+---
+
+## Sprint 14 — Despliegue en producción y buffer
+
+- [ ] **14.1** Cuenta/app en PythonAnywhere con `ProductionConfig`, HTTPS del subdominio (RNF001) y `SECRET_KEY` fuerte por variable de entorno.
+- [ ] **14.2** Despliegue: código → `pip install -r requirements.txt` → `flask db upgrade` → seed de roles → recarga web.
+- [ ] **14.3** Smoke test en producción: registro, combate completo (2 confirmaciones), ranking público, shortcode de WordPress apuntando a producción.
+- [ ] **14.4** Monitoreo de la primera semana (revisión de logs de error), documentar renovación manual (cada 3 meses) y limitaciones del plan gratuito.
+- [ ] **14.5** Buffer de contingencia: atender pendientes/bugs de sprints anteriores.
+- [ ] **14.6** Retrospectiva final y **acta de cierre** del proyecto.
+
+---
+
+## Cierre del proyecto — lista de entregables
+
+- [ ] Código completo en `prototype/` en la rama `desarrollo-sprint-7`, **push al remoto hecho**.
+- [ ] `prototype/docs/openapi.yaml` completo y validado.
+- [ ] `prototype/wordpress-plugin/ranking-table.php` funcional.
+- [ ] `prototype/README.md` + guía de despliegue + manual de usuario.
+- [ ] `.docx` v2 con las 18 figuras insertadas (no modificar el v1.0).
+- [ ] Diagramas `.puml`/`.mmd` sincronizados con la implementación + PNG exportados.
+- [ ] Evidencia de pruebas: 272+ tests en verde, cobertura ranking ≥ 70 %, artefactos de CI.
+- [ ] Evidencia de carga (p95 < 500 ms / 100 usuarios) documentada.
+- [ ] Checklist de `documentation/PLAN_DESARROLLO_PROTOTIPO.md` con los 14 sprints marcados.
+- [ ] `AGENTS.md` actualizado.
+- [ ] Acta de cierre firmada/entregada al supervisor.
+
+---
+
+## Riesgos / puntos de atención
+
+1. **Rama sin remoto**: hasta que se haga `git push -u origin desarrollo-sprint-7`, todo el trabajo (30+ commits) existe solo en local.
+2. **PNG de diagramas inexistentes**: bloquea el 13.4; requiere PlantUML (Java) o Graphviz para exportar `.puml`.
+3. **Endpoints admin de usuarios inexistentes**: el Sprint 10.2 necesita API nueva, no solo UI.
+4. **RNF003 / RNF005** están definidos en `PROPUESTA_NUEVO_STACK.md` §7 (no inventar requisitos; consultar al supervisor si hay dudas).
+5. **Rendimiento del ranking** en SQLite con 100 usuarios: validar en el Sprint 12.5 antes del despliegue real.
