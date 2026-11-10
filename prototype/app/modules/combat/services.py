@@ -545,3 +545,68 @@ def admin_edit_result(admin_id, combat_id, nuevos_datos) -> Combat:
     _invalidar_caché_ranking()
     return combate
 
+
+# ---------------------------------------------------------------------------
+# Consultas del panel de administración (Sprint 10.3)
+# ---------------------------------------------------------------------------
+
+
+def combate_admin_json(combate: Combat) -> dict:
+    """Proyección de un combate para el panel admin (JSON y vistas HTML).
+
+    A diferencia de la proyección pública del API, esta incluye el nombre del
+    árbitro y el del emisor: el panel es una vista **privada** de la comunidad.
+    """
+    return {
+        "id": combate.id,
+        "community_id": combate.community_id,
+        "status": combate.status.value,
+        "reporter_id": combate.reporter_id,
+        "reporter_name": combate.reporter.name if combate.reporter else None,
+        "referee_id": combate.referee_id,
+        "referee_name": combate.referee.name if combate.referee else None,
+        "played_at": combate.played_at.isoformat(),
+        "processed": combate.processed,
+        "created_at": combate.created_at.isoformat(),
+        "winner_id": combate.ganador_id,
+        "participants": [
+            {"user_id": p.user_id, "name": p.user.name, "result": p.result.value}
+            for p in combate.participants
+        ],
+    }
+
+
+def listar_combates_admin(community_id: int, estado=None) -> list[dict]:
+    """Combates de una comunidad para el panel admin, como lista de dicts.
+
+    Args:
+        community_id: comunidad whose combats are listed (RNF006).
+        estado: ``EstadoCombate`` opcional para filtrar (p. ej. ``CONFLICTO``).
+    """
+    combates = CombatRepository.listar_admin(community_id, estado)
+    return [combate_admin_json(c) for c in combates]
+
+
+def auditoria_de_combate(combat_id: int) -> list[dict]:
+    """Bitácora de auditoría de un combate (quién, qué campo y qué valores).
+
+    Cada entrada corresponde a un cambio aplicado por un administrador
+    (RNF008); la traza es inmutable y se muestra en el panel (UC12).
+    """
+    combate = CombatRepository.get_by_id(combat_id)
+    if combate is None:
+        raise NotFoundError(f"No existe el combate {combat_id}.")
+    return [
+        {
+            "id": entrada.id,
+            "combat_id": entrada.combat_id,
+            "admin_id": entrada.admin_id,
+            "admin_name": entrada.admin.name if entrada.admin else None,
+            "campo": entrada.campo,
+            "valor_anterior": entrada.valor_anterior,
+            "valor_nuevo": entrada.valor_nuevo,
+            "created_at": entrada.created_at.isoformat(),
+        }
+        for entrada in AuditLogRepository.entradas_de(combat_id)
+    ]
+

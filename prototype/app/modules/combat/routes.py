@@ -139,3 +139,16 @@ def listar_combates_admin():
     combates = CombatRepository.listar_admin(current_user.community_id, estado)
     return jsonify([_combat_json(c) for c in combates]), 200
 
+
+@bp.get("/admin/combats/<int:combat_id>/audit")
+@api_login_required
+@role_required("admin", "super_admin")
+def auditoria_combate_admin(combat_id: int):
+    """Bitácora de auditoría de un combate (RNF008, UC12).
+
+    Devuelve una entrada por campo modificado por un administrador, con el
+    valor anterior y el nuevo. Es la traza que el panel muestra junto al
+    combate resuelto.
+    """
+    return jsonify(services.auditoria_de_combate(combat_id)), 200
+

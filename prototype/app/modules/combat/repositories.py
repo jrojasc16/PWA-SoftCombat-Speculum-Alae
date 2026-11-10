@@ -7,6 +7,8 @@ trabajan contra esta interfaz y no conocen detalles de la sesión ni de la BD.
 5.2 y 5.3, junto a sus modelos.
 """
 
+from sqlalchemy.orm import selectinload
+
 from app.extensions import db
 from app.modules.combat.domain.estados import EstadoCombate
 from app.modules.combat.models import (
@@ -97,11 +99,18 @@ class CombatRepository:
     def listar_admin(
         community_id: int, status: EstadoCombate | None = None
     ) -> list[Combat]:
-        """Combates de la comunidad para el panel admin (opcionalmente por estado)."""
+        """Combates de la comunidad para el panel admin (opcionalmente por estado).
+
+        Precarga participantes (con su usuario) y árbitro para que el panel
+        pueda pintar nombres sin disparar una consulta por combate (N+1).
+        """
         consulta = db.select(Combat).where(Combat.community_id == community_id)
         if status is not None:
             consulta = consulta.where(Combat.status == status)
-        consulta = consulta.order_by(Combat.played_at.desc(), Combat.id.desc())
+        consulta = consulta.options(
+            selectinload(Combat.participants).selectinload(CombatParticipant.user),
+            selectinload(Combat.referee),
+        ).order_by(Combat.played_at.desc(), Combat.id.desc())
         return list(db.session.execute(consulta).scalars().all())
 
     @staticmethod
@@ -180,11 +189,16 @@ class AuditLogRepository:
 
     @staticmethod
     def entradas_de(combat_id: int) -> list[AuditLog]:
-        """Todas las ediciones de un combate en orden cronológico."""
+        """Todas las ediciones de un combate en orden cronológico.
+
+        Precarga el administrador autor para que el panel pueda mostrar su
+        nombre sin una consulta por entrada (N+1).
+        """
         return list(
             db.session.execute(
                 db.select(AuditLog)
                 .where(AuditLog.combat_id == combat_id)
+                .options(selectinload(AuditLog.admin))
                 .order_by(AuditLog.id)
             )
             .scalars()

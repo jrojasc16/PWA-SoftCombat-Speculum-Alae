@@ -433,6 +433,41 @@ h1 {
   max-width: 22rem;
 }
 
+.admin-tarjeta .formulario {
+  margin-top: 0.75rem;
+}
+
+.auditoria {
+  margin-top: 0.75rem;
+}
+
+.auditoria summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-acento);
+}
+
+.auditoria summary:hover,
+.auditoria summary:focus-visible {
+  text-decoration: underline;
+}
+
+.auditoria .tabla {
+  margin-top: 0.5rem;
+}
+
+.filtros-estado {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.filtros-estado .boton,
+.filtros-estado .boton-secundario {
+  margin-top: 0;
+}
+
 button[disabled],
 select[disabled] {
   opacity: 0.55;

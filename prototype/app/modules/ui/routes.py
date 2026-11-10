@@ -14,6 +14,8 @@ Reglas de la capa de presentación (regla transversal 4):
 from flask import Blueprint, redirect, render_template, request, url_for
 from flask_login import current_user, login_user, logout_user
 
+from app.modules.combat import services as combat_services
+from app.modules.combat.domain.estados import EstadoCombate
 from app.modules.history import services as history_services
 from app.modules.iam import services as iam_services
 from app.modules.public_api import services as public_api_services
@@ -276,6 +278,11 @@ def admin_panel():
         total_usuarios=len(
             iam_services.listar_usuarios_para_admin(current_user.id)
         ),
+        total_conflictos=len(
+            combat_services.listar_combates_admin(
+                current_user.community_id, EstadoCombate.CONFLICTO
+            )
+        ),
     )
 
 
@@ -306,5 +313,45 @@ def admin_usuarios():
         total_paginas=total_paginas,
         hay_anterior=page > 1,
         hay_siguiente=page < total_paginas,
+        error=error,
+    )
+
+
+@bp.get(f"{PREFIJO_PANEL}/combates")
+@role_required_html("admin", "super_admin")
+def admin_combates():
+    """Combates en conflicto con formulario de edición y bitácora (UC12).
+
+    Por defecto muestra los ``CONFLICTO``; con ``?estado=`` se puede ver
+    cualquier estado. Cada combate trae su ``AuditLog`` para que el admin
+    vea quién cambió qué y cuándo (RNF008).
+    """
+    error = None
+    estado_texto = request.args.get("estado", EstadoCombate.CONFLICTO.value)
+    try:
+        estado = EstadoCombate(estado_texto)
+    except ValueError:
+        error = (
+            f"Estado inválido '{estado_texto}': use PENDIENTE, CONFIRMADO, "
+            "CONFLICTO o RESUELTO."
+        )
+        estado = EstadoCombate.CONFLICTO
+        estado_texto = estado.value
+
+    combates = combat_services.listar_combates_admin(
+        current_user.community_id, estado
+    )
+    total = len(combates)
+    auditorias = {
+        combate["id"]: combat_services.auditoria_de_combate(combate["id"])
+        for combate in combates
+    }
+    return render_template(
+        "admin/combates.html",
+        combates=combates,
+        auditorias=auditorias,
+        total=total,
+        estado_actual=estado_texto,
+        estados=[e.value for e in EstadoCombate],
         error=error,
     )

@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block titulo %}Combates — Panel de administración{% endblock %}
+
+{% block contenido %}
+<section>
+  <h1>Combates</h1>
+  <p class="ayuda">
+    Resuelve los conflictos declarando el resultado real. Cada cambio queda
+    en la bitácora de auditoría y recalcula el ranking de la comunidad.
+  </p>
+
+  {% if error %}
+  <p class="mensaje mensaje-error" role="alert">{{ error }}</p>
+  {% endif %}
+
+  <p id="estado-combates" class="mensaje" role="status" hidden></p>
+
+  <nav class="paginacion filtros-estado" aria-label="Filtrar por estado">
+    {% for estado in estados %}
+    <a
+      class="boton-secundario {{ 'boton' if estado == estado_actual }}"
+      href="{{ url_for('ui.admin_combates', estado=estado) }}"
+      >{{ estado }}</a
+    >
+    {% endfor %}
+  </nav>
+
+  <div id="lista-combates" aria-live="polite">
+    {% if combates %}
+    {% for combate in combates %}
+    <div class="tarjeta admin-tarjeta" data-combate-id="{{ combate.id }}">
+      <h2>
+        Combate #{{ combate.id }} — {{ combate.played_at[:16].replace("T", " ") }}
+      </h2>
+
+      <p class="ayuda">
+        Estado:
+        <span class="etiqueta etiqueta-{{ combate.status|lower }}">
+          {{ combate.status }}
+        </span>
+        · Reportado por {{ combate.reporter_name or "—" }} ·
+        Árbitro: {{ combate.referee_name or "sin asignar" }} ·
+        Jugado: {{ combate.played_at[:16].replace("T", " ") }}
+      </p>
+
+      <div class="acciones-fila">
+        {% for participante in combate.participants %}
+        <span class="etiqueta">
+          {{ participante.name }} — {{ participante.result }}
+        </span>
+        {% endfor %}
+      </div>
+
+      <form class="formulario form-editar" data-id="{{ combate.id }}">
+        <label for="ganador-{{ combate.id }}">Ganador real</label>
+        <select id="ganador-{{ combate.id }}" name="winner_id" required>
+          <option value="">Elige al ganador…</option>
+          {% for participante in combate.participants %}
+          <option
+            value="{{ participante.user_id }}"
+            {% if combate.winner_id == participante.user_id %}selected{% endif %}
+          >
+            {{ participante.name }}
+          </option>
+          {% endfor %}
+        </select>
+
+        <label for="fecha-{{ combate.id }}">Fecha y hora del combate</label>
+        <input
+          type="datetime-local"
+          id="fecha-{{ combate.id }}"
+          name="played_at"
+          value="{{ combate.played_at[:16] }}"
+        />
+
+        <button type="submit" class="boton">Guardar y resolver</button>
+      </form>
+
+      <details class="auditoria">
+        <summary>Bitácora de auditoría ({{ auditorias[combate.id]|length }})</summary>
+        {% if auditorias[combate.id] %}
+        <div class="tabla-envoltura">
+          <table class="tabla">
+            <thead>
+              <tr>
+                <th scope="col">Fecha</th>
+                <th scope="col">Administrador</th>
+                <th scope="col">Campo</th>
+                <th scope="col">Anterior</th>
+                <th scope="col">Nuevo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for entrada in auditorias[combate.id] %}
+              <tr>
+                <td>{{ entrada.created_at[:16].replace("T", " ") }}</td>
+                <td>{{ entrada.admin_name or "—" }}</td>
+                <td>{{ entrada.campo }}</td>
+                <td>{{ entrada.valor_anterior if entrada.valor_anterior is not none else "—" }}</td>
+                <td>{{ entrada.valor_nuevo if entrada.valor_nuevo is not none else "—" }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="vacio">Este combate todavía no tiene ediciones registradas.</p>
+        {% endif %}
+      </details>
+    </div>
+    {% endfor %}
+    {% else %}
+    <p class="vacio">
+      No hay combates en estado {{ estado_actual }} en tu comunidad.
+    </p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/admin.js') }}" defer></script>
+{% endblock %}
