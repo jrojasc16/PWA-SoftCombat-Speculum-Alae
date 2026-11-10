@@ -248,3 +248,39 @@ def test_el_boton_de_envio_se_bloquea_durante_el_envio(client):
     js = client.get("/static/js/reportar.js").get_data(as_text=True)
     assert "boton.disabled = true" in js
     assert "boton.disabled = false" in js
+
+
+# ---------------------------------------------------------------------------
+# 9.4 — Listado de reportes pendientes de envío con estado por ítem
+# ---------------------------------------------------------------------------
+
+
+def test_la_vista_de_reportar_lista_los_reportes_guardados(client, jugador):
+    _login(client, jugador)
+    html = client.get("/reportar").get_data(as_text=True)
+    assert 'id="lista-pendientes"' in html
+    assert 'id="btn-reintentar"' in html
+    assert 'id="btn-limpiar-enviados"' in html
+    assert "Reportes pendientes de envío" in html
+
+
+def test_la_lista_muestra_el_estado_de_cada_item(client):
+    js = client.get("/static/js/reportar.js").get_data(as_text=True)
+    assert "pintarPendientes" in js
+    assert "etiqueta-pendiente" in js
+    assert "etiqueta-enviado" in js
+    assert "etiqueta-error" in js
+    assert "Descartar" in js
+    assert "Intentos:" in js
+
+
+def test_la_lista_se_actualiza_al_cambiar_la_cola(client):
+    js = client.get("/static/js/reportar.js").get_data(as_text=True)
+    assert 'addEventListener("sa-outbox-cambio"' in js
+    assert "cargarPendientes()" in js
+
+
+def test_los_estilos_de_los_estados_existen(client):
+    css = client.get("/static/css/estilos.css").get_data(as_text=True)
+    assert ".etiqueta-enviado" in css
+    assert ".etiqueta-error" in css

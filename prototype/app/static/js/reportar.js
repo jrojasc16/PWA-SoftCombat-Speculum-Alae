@@ -22,6 +22,9 @@
   const campoJugado = document.getElementById("jugado");
   const listaJugadores = document.getElementById("lista-jugadores");
   const listaArbitros = document.getElementById("lista-arbitros");
+  const listaPendientes = document.getElementById("lista-pendientes");
+  const botonReintentar = document.getElementById("btn-reintentar");
+  const botonLimpiar = document.getElementById("btn-limpiar-enviados");
 
   let jugadores = [];
   let arbitros = [];
@@ -92,8 +95,7 @@
     }
   }
 
-  /** Encola el reporte para enviarlo cuando vuelva la red. */
-  async function encolarReporte(cuerpo, resumen, clave) {
+  /** Encola el reporte para enviarlo cuando vuelva la red. */  async function encolarReporte(cuerpo, resumen, clave) {
     if (!window.SASync || !window.SAOutbox || !window.SAOutbox.disponible()) {
       mostrar(
         "Sin conexión y este navegador no permite guardar el reporte: inténtalo de nuevo cuando vuelva la red.",
@@ -118,6 +120,143 @@
       return false;
     }
   }
+
+  /* --- Listado de reportes pendientes de envío (Sprint 9.4) ------------- */
+
+  const ETIQUETAS = {
+    pendiente: { texto: "Pendiente", clase: "etiqueta-pendiente" },
+    enviado: { texto: "Enviado", clase: "etiqueta-enviado" },
+    error: { texto: "Error", clase: "etiqueta-error" },
+  };
+
+  /** Texto y estilo del estado de un ítem de la cola. */
+  function estadoItem(item) {
+    if (item.estado === "enviado") {
+      return {
+        texto: item.combat_id ? "Enviado (#" + item.combat_id + ")" : "Enviado",
+        clase: "etiqueta-enviado",
+      };
+    }
+    const base = ETIQUETAS[item.estado] || ETIQUETAS.pendiente;
+    return { texto: base.texto, clase: base.clase };
+  }
+
+  /** Pinta la cola local: una fila por reporte con su estado. */
+  function pintarPendientes(items) {
+    if (!listaPendientes) return;
+    if (!items || items.length === 0) {
+      listaPendientes.innerHTML = '<p class="vacio">No hay reportes guardados.</p>';
+      return;
+    }
+
+    const filas = items
+      .map((item) => {
+        const estado = estadoItem(item);
+        const resumen = item.resumen || {};
+        const cuando = (item.created_at || "").slice(0, 16).replace("T", " ");
+        const detalle = item.last_error
+          ? item.last_error
+          : "Intentos: " + (item.intentos || 0);
+        return (
+          "<tr>" +
+          "<td>" + escapar(cuando) + "</td>" +
+          "<td>" + escapar(resumen.oponente || "—") + "</td>" +
+          "<td>" + escapar(resumen.resultado || "—") + "</td>" +
+          '<td><span class="etiqueta ' + estado.clase + '">' + estado.texto + "</span></td>" +
+          "<td>" + escapar(detalle) + "</td>" +
+          '<td><button type="button" class="boton-secundario btn-descartar" data-clave="' +
+          escapar(item.client_request_id) + '">Descartar</button></td>' +
+          "</tr>"
+        );
+      })
+      .join("");
+
+    listaPendientes.innerHTML =
+      '<table class="tabla"><thead><tr>' +
+      "<th scope=\"col\">Guardado</th>" +
+      "<th scope=\"col\">Oponente</th>" +
+      "<th scope=\"col\">Resultado</th>" +
+      "<th scope=\"col\">Estado</th>" +
+      "<th scope=\"col\">Detalle</th>" +
+      "<th scope=\"col\">Acciones</th>" +
+      "</tr></thead><tbody>" +
+      filas +
+      "</tbody></table>";
+  }
+
+  /** Escapa texto para insertarlo en el HTML de la lista. */
+  function escapar(texto) {
+    const div = document.createElement("div");
+    div.textContent = texto === null || texto === undefined ? "" : String(texto);
+    return div.innerHTML;
+  }
+
+  /** Lee la cola local y la pinta. */
+  async function cargarPendientes() {
+    if (!listaPendientes) return;
+    if (!window.SAOutbox || !window.SAOutbox.disponible()) {
+      listaPendientes.innerHTML =
+        '<p class="vacio">Este navegador no permite guardar reportes sin conexión.</p>';
+      return;
+    }
+    try {
+      const items = await window.SAOutbox.listar();
+      pintarPendientes(items);
+    } catch (error) {
+      listaPendientes.innerHTML =
+        '<p class="vacio">No se pudo leer la cola de reportes guardados.</p>';
+    }
+  }
+
+  /** Descarta un reporte de la cola. */
+  async function descartar(clave) {
+    if (!window.SAOutbox) return;
+    await window.SAOutbox.eliminar(clave).catch(() => null);
+    await cargarPendientes();
+  }
+
+  if (listaPendientes) {
+    listaPendientes.addEventListener("click", (evento) => {
+      const boton = evento.target.closest(".btn-descartar");
+      if (!boton) return;
+      descartar(boton.getAttribute("data-clave"));
+    });
+  }
+
+  if (botonReintentar) {
+    botonReintentar.addEventListener("click", async () => {
+      if (!window.SAOutbox || !window.SASync) return;
+      const items = await window.SAOutbox.listar().catch(() => []);
+      for (const item of items) {
+        if (item.estado === "error") {
+          await window.SAOutbox.actualizar(item.client_request_id, {
+            estado: "pendiente",
+            next_attempt_at: 0,
+            last_error: "",
+          }).catch(() => null);
+        }
+      }
+      await window.SASync.sincronizar();
+      await cargarPendientes();
+    });
+  }
+
+  if (botonLimpiar) {
+    botonLimpiar.addEventListener("click", async () => {
+      if (!window.SAOutbox) return;
+      const items = await window.SAOutbox.listar().catch(() => []);
+      for (const item of items) {
+        if (item.estado === "enviado") {
+          await window.SAOutbox.eliminar(item.client_request_id).catch(() => null);
+        }
+      }
+      await cargarPendientes();
+    });
+  }
+
+  document.addEventListener("sa-outbox-cambio", () => {
+    cargarPendientes();
+  });
 
   formulario.addEventListener("submit", async (evento) => {
     evento.preventDefault();
@@ -204,4 +343,5 @@
   });
 
   cargarDirectorio();
+  cargarPendientes();
 })();

@@ -348,6 +348,16 @@ h1 {
   color: #303f9f;
 }
 
+.etiqueta-enviado {
+  background: var(--color-ok-fondo);
+  color: #1b5e20;
+}
+
+.etiqueta-error {
+  background: var(--color-error-fondo);
+  color: var(--color-error);
+}
+
 .delta-positivo {
   color: var(--color-ok);
   font-weight: 600;

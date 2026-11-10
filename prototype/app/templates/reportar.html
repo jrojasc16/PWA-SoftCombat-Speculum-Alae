@@ -56,6 +56,28 @@
       <button type="submit" class="boton">Enviar reporte</button>
     </form>
   </div>
+
+  <div class="tarjeta">
+    <h2>Reportes pendientes de envío</h2>
+    <p class="ayuda">
+      Los reportes que envías sin conexión quedan guardados en este dispositivo y
+      se envían solos al recuperar la red. Si el servidor ya tenía el combate,
+      no se crea otro.
+    </p>
+
+    <div id="lista-pendientes" class="tabla-envoltura">
+      <p class="vacio">No hay reportes guardados.</p>
+    </div>
+
+    <div class="acciones">
+      <button type="button" id="btn-reintentar" class="boton-secundario">
+        Reintentar ahora
+      </button>
+      <button type="button" id="btn-limpiar-enviados" class="boton-secundario">
+        Limpiar los ya enviados
+      </button>
+    </div>
+  </div>
 </section>
 {% endblock %}
 
