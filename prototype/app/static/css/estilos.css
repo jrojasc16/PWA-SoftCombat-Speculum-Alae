@@ -6,19 +6,19 @@
  */
 
 :root {
-  --color-fondo: #f4f5f7;
+  --color-fondo: #e3e3e3;
   --color-superficie: #ffffff;
-  --color-texto: #1f2430;
+  --color-texto: #301f2d;
   --color-texto-suave: #5b6270;
-  --color-borde: #d9dde5;
-  --color-acento: #2f4f8f;
-  --color-acento-oscuro: #233c6e;
-  --color-error: #b3261e;
+  --color-borde: #e1ce00;
+  --color-acento: #8d2f8f;
+  --color-acento-oscuro: #550a56;
+  --color-error: #cf2424;
   --color-error-fondo: #fdecea;
-  --color-ok: #1b5e20;
+  --color-ok: #3bd145;
   --color-ok-fondo: #e8f5e9;
   --radio: 10px;
-  --sombra: 0 1px 3px rgba(20, 24, 34, 0.12);
+  --sombra: 0 1px 3px rgba(255, 20, 34, 0.20);
 }
 
 * {
@@ -49,13 +49,13 @@ a {
   gap: 0.75rem;
   padding: 0.75rem 1rem;
   background: var(--color-acento-oscuro);
-  color: #fff;
+  color: #e1ce00;
 }
 
 .marca {
   font-weight: 700;
   font-size: 1.1rem;
-  color: #fff;
+  color: #e1ce00;
   text-decoration: none;
   margin-right: auto;
 }
@@ -229,7 +229,7 @@ h1 {
 
 .boton {
   background: var(--color-acento);
-  color: #fff;
+  color: #e1ce00;
 }
 
 .boton:hover,

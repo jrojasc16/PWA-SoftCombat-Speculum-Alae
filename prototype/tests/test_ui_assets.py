@@ -91,6 +91,43 @@ def test_manifest_es_json_valido(client):
     assert datos["display"] == "standalone"
 
 
+def test_manifest_tiene_los_campos_de_instalabilidad(client):
+    """Criterios de instalabilidad de una PWA (tarea 8.1)."""
+    datos = client.get("/static/manifest.json").get_json()
+    assert datos["name"]
+    assert datos["short_name"]
+    assert datos["start_url"].startswith("/")
+    assert datos["scope"] == "/"
+    assert datos["display"] == "standalone"
+    assert datos["theme_color"].startswith("#")
+    assert datos["background_color"].startswith("#")
+    assert datos["lang"] == "es"
+
+
+def test_manifest_declara_iconos_192_y_512(client):
+    datos = client.get("/static/manifest.json").get_json()
+    tamanos = {icono["sizes"] for icono in datos["icons"]}
+    assert {"192x192", "512x512"} <= tamanos
+    for icono in datos["icons"]:
+        assert icono["type"] == "image/png"
+        assert "maskable" in icono["purpose"]
+
+
+def test_iconos_png_se_sirven_con_las_dimensiones_declaradas(client):
+    manifest = client.get("/static/manifest.json").get_json()
+    for icono in manifest["icons"]:
+        r = client.get(icono["src"])
+        assert r.status_code == 200
+        assert r.content_type == "image/png"
+        datos = r.get_data()
+        # Firma PNG (8 bytes) + IHDR con ancho y alto en big-endian.
+        assert datos[:8] == b"\x89PNG\r\n\x1a\n"
+        ancho = int.from_bytes(datos[16:20], "big")
+        alto = int.from_bytes(datos[20:24], "big")
+        lado = int(icono["sizes"].split("x")[0])
+        assert (ancho, alto) == (lado, lado)
+
+
 def test_css_responsive_define_media_queries(client):
     css = client.get("/static/css/estilos.css").get_data(as_text=True)
     # Mobile-first con punto de corte a 720px (RNF003: usable en móvil).
