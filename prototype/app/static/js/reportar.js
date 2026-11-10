@@ -131,7 +131,6 @@
       mostrar("Elige un oponente existente de la lista.", true);
       return;
     }
-
     let idArbitro = null;
     if (campoArbitro.value.trim() !== "") {
       idArbitro = resolverId(arbitros, campoArbitro.value);
@@ -166,6 +165,11 @@
       return;
     }
 
+    // Se bloquea el botón mientras se envía: dos envíos con la misma sesión
+    // generarían dos claves y, por tanto, dos combates.
+    const boton = formulario.querySelector('button[type="submit"]');
+    if (boton) boton.disabled = true;
+
     try {
       const respuesta = await fetch("/combats", {
         method: "POST",
@@ -180,8 +184,11 @@
       });
       const datos = await respuesta.json();
       if (respuesta.ok) {
+        // 200 = el servidor ya tenía ese reporte (reenvío): no es un error.
         mostrar(
-          "Combate #" + datos.id + " registrado. Queda pendiente de confirmación.",
+          respuesta.status === 200
+            ? "Ese combate ya estaba registrado (#" + datos.id + ")."
+            : "Combate #" + datos.id + " registrado. Queda pendiente de confirmación.",
           false
         );
         formulario.reset();
@@ -191,6 +198,8 @@
     } catch (_error) {
       // La red se cayó durante el envío: el reporte no se pierde.
       await encolarReporte(cuerpo, resumen, clave);
+    } finally {
+      if (boton) boton.disabled = false;
     }
   });
 

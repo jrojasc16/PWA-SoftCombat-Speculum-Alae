@@ -165,3 +165,86 @@ def test_al_cerrar_sesion_se_borra_el_directorio_local(client, jugador):
     assert 'id="enlace-salir"' in html
     js = client.get("/static/js/app.js").get_data(as_text=True)
     assert "borrarDirectorio" in js
+
+
+# ---------------------------------------------------------------------------
+# 9.3 — Idempotencia: el mismo client_request_id nunca crea dos combates
+# ---------------------------------------------------------------------------
+
+
+def _reporte(clave, rival_id, ganador=None):
+    """Cuerpo de un reporte con clave de idempotencia."""
+    return {
+        "participants": [1, rival_id],
+        "winner": ganador if ganador is not None else 1,
+        "played_at": "2026-11-01T18:00:00",
+        "client_request_id": clave,
+    }
+
+
+def test_el_segundo_envio_con_la_misma_clave_no_crea_otro_combate(
+    client, jugador, roles
+):
+    rival = _usuario("beto@x.com", "Beto Ruiz")
+    _login(client, jugador)
+
+    primero = client.post("/combats", json=_reporte("clave-abc-123", rival.id))
+    assert primero.status_code == 201
+
+    segundo = client.post("/combats", json=_reporte("clave-abc-123", rival.id))
+    assert segundo.status_code == 200
+    assert segundo.get_json()["id"] == primero.get_json()["id"]
+
+    pendientes = client.get("/combats/pending").get_json()
+    assert len([c for c in pendientes if c["reporter_id"] == jugador.id]) == 1
+
+
+def test_un_reenvio_con_la_misma_clave_devuelve_el_combate_original(
+    client, jugador, roles
+):
+    """Aunque cambie el cuerpo, la clave devuelve el combate ya creado."""
+    rival = _usuario("beto@x.com", "Beto Ruiz")
+    _login(client, jugador)
+
+    primero = client.post("/combats", json=_reporte("clave-xyz", rival.id))
+    assert primero.status_code == 201
+
+    segundo = client.post(
+        "/combats", json=_reporte("clave-xyz", rival.id, ganador=rival.id)
+    )
+    assert segundo.status_code == 200
+    datos = segundo.get_json()
+    assert datos["id"] == primero.get_json()["id"]
+    # El resultado original no se modifica: el reenvío no tiene efectos.
+    assert datos["status"] == "PENDIENTE"
+
+
+def test_una_clave_demasiado_larga_se_rechaza(client, jugador, roles):
+    rival = _usuario("beto@x.com", "Beto Ruiz")
+    _login(client, jugador)
+    r = client.post("/combats", json=_reporte("c" * 65, rival.id))
+    assert r.status_code == 400
+    assert "client_request_id" in r.get_json()["error"]
+
+
+def test_la_clave_de_idempotencia_se_genera_antes_de_enviar(client):
+    """El cliente genera la clave antes del envío y la reutiliza al encolar."""
+    js = client.get("/static/js/reportar.js").get_data(as_text=True)
+    assert "const clave = window.SASync ? window.SASync.nuevaClave() : null;" in js
+    assert "client_request_id: clave" in js
+    assert "encolarReporte(cuerpo, resumen, clave)" in js
+
+
+def test_el_cliente_no_muestra_error_cuando_el_reporte_ya_existia(client):
+    """Un 200 (reenvío) se informa como registro, no como error."""
+    js = client.get("/static/js/reportar.js").get_data(as_text=True)
+    assert "ya estaba registrado" in js
+    sync = client.get("/static/js/sync.js").get_data(as_text=True)
+    assert "yaRegistrado" in sync
+    assert 'estado: "enviado"' in sync
+
+
+def test_el_boton_de_envio_se_bloquea_durante_el_envio(client):
+    js = client.get("/static/js/reportar.js").get_data(as_text=True)
+    assert "boton.disabled = true" in js
+    assert "boton.disabled = false" in js
