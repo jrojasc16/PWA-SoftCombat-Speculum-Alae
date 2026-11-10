@@ -587,15 +587,30 @@ def listar_combates_admin(community_id: int, estado=None) -> list[dict]:
     return [combate_admin_json(c) for c in combates]
 
 
-def auditoria_de_combate(combat_id: int) -> list[dict]:
+def auditoria_de_combate(combat_id: int, admin_id=None) -> list[dict]:
     """Bitácora de auditoría de un combate (quién, qué campo y qué valores).
 
     Cada entrada corresponde a un cambio aplicado por un administrador
     (RNF008); la traza es inmutable y se muestra en el panel (UC12).
+
+    Args:
+        combat_id: combate cuya bitácora se consulta.
+        admin_id: administrador que consulta. Si se indica, se valida que
+            pertenezca a la **misma comunidad** que el combate (RNF006).
+
+    Raises:
+        NotFoundError: el combate no existe (404).
+        ForbiddenError: el combate pertenece a otra comunidad (403).
     """
     combate = CombatRepository.get_by_id(combat_id)
     if combate is None:
         raise NotFoundError(f"No existe el combate {combat_id}.")
+    if admin_id is not None:
+        admin = _usuario_o_error(admin_id, "admin_id")
+        if admin.community_id != combate.community_id:
+            raise ForbiddenError(
+                "No tienes permisos para consultar combates de otra comunidad."
+            )
     return [
         {
             "id": entrada.id,

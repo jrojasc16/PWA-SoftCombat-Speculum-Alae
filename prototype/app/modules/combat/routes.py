@@ -148,7 +148,8 @@ def auditoria_combate_admin(combat_id: int):
 
     Devuelve una entrada por campo modificado por un administrador, con el
     valor anterior y el nuevo. Es la traza que el panel muestra junto al
-    combate resuelto.
+    combate resuelto. Solo se puede consultar la bitácora de los combates de
+    la comunidad del administrador (RNF006).
     """
-    return jsonify(services.auditoria_de_combate(combat_id)), 200
+    return jsonify(services.auditoria_de_combate(combat_id, current_user.id)), 200
 
