@@ -188,3 +188,49 @@ def test_sw_ignora_el_ranking_en_la_estrategia_de_red_primero(client):
     sw = client.get("/static/sw.js").get_data(as_text=True)
     rama_red = sw.split("Navegaciones y estáticos")[1]
     assert 'url.pathname === "/api/ranking"' not in rama_red
+
+
+# ---------------------------------------------------------------------------
+# Indicador de modo offline y marca de tiempo de los datos (tarea 8.3)
+# ---------------------------------------------------------------------------
+
+
+def test_layout_incluye_aviso_offline_y_marca_de_datos(client):
+    html = client.get("/").get_data(as_text=True)
+    assert 'id="aviso-offline"' in html
+    assert 'id="marca-datos"' in html
+    assert 'role="status"' in html
+
+
+def test_js_comun_registra_el_sw_y_gestiona_el_estado_de_red(client):
+    js = client.get("/static/js/app.js").get_data(as_text=True)
+    assert 'register("/static/sw.js")' in js
+    assert 'addEventListener("online"' in js
+    assert 'addEventListener("offline"' in js
+    assert "X-SW-Cache-Time" in js
+    assert "Datos de las " in js
+
+
+def test_js_comun_purga_la_cache_al_cerrar_sesion(client, usuario):
+    _login(client, usuario)
+    html = client.get("/").get_data(as_text=True)
+    assert 'id="enlace-salir"' in html
+    js = client.get("/static/js/app.js").get_data(as_text=True)
+    assert "sa-limpiar-cache" in js
+
+
+def test_pagina_offline_responde_y_pinta_las_copias_guardadas(client):
+    r = client.get("/offline")
+    assert r.status_code == 200
+    html = r.get_data(as_text=True)
+    assert "js/offline.js" in html
+    assert 'id="ranking-offline"' in html
+    assert 'id="historial-offline"' in html
+
+
+def test_sw_sirve_la_pagina_offline_y_entrega_los_datos_cacheados(client):
+    sw = client.get("/static/sw.js").get_data(as_text=True)
+    assert '"/offline"' in sw
+    assert "sa-datos-cache" in sw
+    js = client.get("/static/js/offline.js").get_data(as_text=True)
+    assert "sa-datos-cache" in js

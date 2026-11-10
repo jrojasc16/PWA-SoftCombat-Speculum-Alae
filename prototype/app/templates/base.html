@@ -22,6 +22,13 @@
     />
   </head>
   <body>
+    <div
+      id="aviso-offline"
+      class="aviso-offline"
+      role="status"
+      aria-live="polite"
+      hidden
+    ></div>
     <header class="cabecera">
       <a class="marca" href="{{ url_for('ui.inicio') }}">Speculum-Alae</a>
 
@@ -42,7 +49,9 @@
         <a href="{{ url_for('ui.pendientes') }}">Pendientes</a>
         <a href="{{ url_for('ui.historial') }}">Historial</a>
         <span class="nav-usuario">{{ usuario.name }}</span>
-        <a class="boton-secundario" href="{{ url_for('ui.salir') }}">Salir</a>
+        <a id="enlace-salir" class="boton-secundario" href="{{ url_for('ui.salir') }}"
+          >Salir</a
+        >
         {% else %}
         <a href="{{ url_for('ui.login_view') }}">Iniciar sesión</a>
         <a class="boton" href="{{ url_for('ui.registro_view') }}">Registrarse</a>
@@ -51,6 +60,7 @@
     </header>
 
     <main class="contenido">
+      <p id="marca-datos" class="marca-datos" hidden></p>
       {% block contenido %}{% endblock %}
     </main>
 

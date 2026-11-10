@@ -358,6 +358,35 @@ h1 {
   font-weight: 600;
 }
 
+/* --- Aviso de conexión y marca de tiempo (Sprint 8.3) -------------------- */
+
+.aviso-offline {
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  text-align: center;
+  background: #eef1f6;
+  color: var(--color-texto-suave);
+  border-bottom: 1px solid var(--color-borde);
+}
+
+.aviso-offline--sin-red {
+  background: #fff4e5;
+  color: #8a5300;
+  font-weight: 600;
+}
+
+.aviso-offline--con-datos {
+  background: var(--color-ok-fondo);
+  color: #1b5e20;
+}
+
+.marca-datos {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  color: var(--color-texto-suave);
+  font-style: italic;
+}
+
 /* --- Utilidades -------------------------------------------------------- */
 
 .paginacion {

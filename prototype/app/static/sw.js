@@ -23,6 +23,7 @@ const CABECERA_MARCA = "X-SW-Cache-Time";
 const APP_SHELL = [
   "/",
   "/ranking",
+  "/offline",
   "/static/css/estilos.css",
   "/static/js/app.js",
   "/static/manifest.json",
@@ -94,7 +95,7 @@ self.addEventListener("fetch", (evento) => {
           return respuesta;
         })
         .catch(() =>
-          caches.match(peticion).then((guardada) => guardada || caches.match("/ranking"))
+          caches.match(peticion).then((guardada) => guardada || caches.match("/offline"))
         )
     );
     return;
@@ -113,6 +114,20 @@ self.addEventListener("message", (evento) => {
   if (datos.tipo === "sa-limpiar-cache") {
     // Al cerrar sesión, el historial propio cacheado deja de ser válido.
     evento.waitUntil(limpiarCachePersonal());
+    return;
+  }
+
+  if (datos.tipo === "sa-datos-cache") {
+    // La página sin conexión pide el contenido JSON de las copias guardadas.
+    evento.waitUntil(
+      datosCacheados().then((datos) => {
+        if (evento.ports && evento.ports[0]) {
+          evento.ports[0].postMessage({ tipo: "sa-datos-cache", datos });
+        } else if (evento.source) {
+          evento.source.postMessage({ tipo: "sa-datos-cache", datos });
+        }
+      })
+    );
     return;
   }
 
@@ -137,6 +152,22 @@ async function limpiarCachePersonal() {
       .filter((peticion) => new URL(peticion.url).pathname.startsWith("/me"))
       .map((peticion) => cache.delete(peticion))
   );
+}
+
+/** Contenido JSON de las copias guardadas de las lecturas SWR. */
+async function datosCacheados() {
+  const cache = await caches.open(CACHE_LECTURA);
+  const datos = {};
+  for (const ruta of RUTAS_SWR) {
+    const guardada = await cache.match(ruta);
+    if (!guardada) continue;
+    try {
+      datos[ruta] = await guardada.clone().json();
+    } catch (error) {
+      // La copia no es JSON válido: se ignora.
+    }
+  }
+  return datos;
 }
 
 /** Indica si la ruta usa la estrategia stale-while-revalidate. */
@@ -166,11 +197,10 @@ async function responderConSWR(peticion) {
 
   const desdeRed = fetch(peticion)
     .then(async (respuesta) => {
-      if (respuesta.ok) {
-        await guardarConMarca(cache, peticion, respuesta);
-        await avisarActualizacion(peticion.url);
-      }
-      return respuesta;
+      if (!respuesta.ok) return respuesta;
+      const marcada = await guardarConMarca(cache, peticion, respuesta);
+      await avisarActualizacion(peticion.url);
+      return marcada;
     })
     .catch(() => null);
 
@@ -202,7 +232,8 @@ async function guardarConMarca(cache, peticion, respuesta) {
     statusText: respuesta.statusText,
     headers: cabeceras,
   });
-  await cache.put(peticion, marcada);
+  await cache.put(peticion, marcada.clone());
+  return marcada;
 }
 
 /** Avisa a las pestañas abiertas que hay una versión fresca en la caché. */

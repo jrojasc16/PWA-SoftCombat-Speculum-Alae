@@ -73,6 +73,17 @@ def inicio():
     return render_template("inicio.html")
 
 
+@bp.get("/offline")
+def offline():
+    """Página de respaldo sin conexión (Sprint 8.3).
+
+    La sirve el service worker cuando una navegación falla: pinta las copias
+    guardadas del ranking público y del historial propio. Es pública y no
+    necesita sesión.
+    """
+    return render_template("offline.html")
+
+
 @bp.get("/ranking")
 def ranking():
     """Ranking público de la comunidad, servido desde la misma caché que la API.

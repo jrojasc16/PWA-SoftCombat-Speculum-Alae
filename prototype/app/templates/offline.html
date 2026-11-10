@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block titulo %}Sin conexión — Speculum-Alae{% endblock %}
+
+{% block contenido %}
+<section>
+  <h1>Estás sin conexión</h1>
+
+  <p class="ayuda">
+    No hay conexión con el servidor. Te mostramos las últimas copias guardadas
+    en este dispositivo; en cuanto vuelva la red se actualizarán solas.
+  </p>
+
+  <div class="tarjeta">
+    <h2>Ranking (copia guardada)</h2>
+    <div id="ranking-offline" class="tabla-envoltura">
+      <p class="vacio">Cargando la copia guardada…</p>
+    </div>
+  </div>
+
+  <div class="tarjeta">
+    <h2>Mi historial (copia guardada)</h2>
+    <div id="historial-offline" class="tabla-envoltura">
+      <p class="vacio">Cargando la copia guardada…</p>
+    </div>
+  </div>
+
+  <div class="acciones">
+    <a class="boton" href="{{ url_for('ui.ranking') }}">Ir al ranking</a>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/offline.js') }}" defer></script>
+{% endblock %}
