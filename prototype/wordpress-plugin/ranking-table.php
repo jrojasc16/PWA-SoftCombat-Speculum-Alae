@@ -30,6 +30,103 @@ define( 'SA_RANKING_TTL_DEFECTO', 300 );
 /** Segundos de espera máxima por petición al backend. */
 define( 'SA_RANKING_TIMEOUT', 5 );
 
+/** Transient con el HTML vigente: caduca a los TTL configurados (~5 min). */
+define( 'SA_RANKING_TRANSIENTE', 'sa_ranking_cache' );
+
+/**
+ * Transient de respaldo: conserva el último HTML **sin** caducidad para
+ * poder servir una copia desactualizada si el backend deja de responder.
+ */
+define( 'SA_RANKING_TRANSIENTE_RESPALDO', 'sa_ranking_respaldo' );
+
+/**
+ * TTL efectivo del caché (segundos).
+ *
+ * Por defecto son los ~5 minutos del diseño (RNF004/RF12); el valor
+ * configurable desde los ajustes se añade en la tarea 11.3.
+ *
+ * @return int Segundos (>= 0).
+ */
+function sa_ranking_ttl() {
+	return SA_RANKING_TTL_DEFECTO;
+}
+
+/**
+ * Clave interna del caché para una combinación de comunidad y página.
+ *
+ * El transient guarda un array con varias entradas (una por shortcode con
+ * atributos distintos), así que hace falta distinguirlas dentro.
+ *
+ * @param int $comunidad  Comunidad.
+ * @param int $por_pagina Tamaño de página.
+ * @return string Clave estable, p. ej. "1x50".
+ */
+function sa_ranking_clave( $comunidad, $por_pagina ) {
+	return $comunidad . 'x' . $por_pagina;
+}
+
+/**
+ * Devuelve el HTML cacheado si el caché sigue vivo.
+ *
+ * @param string $clave Clave interna (ver sa_ranking_clave).
+ * @return string|null HTML o null si no hay caché vigente.
+ */
+function sa_ranking_leer_cache( $clave ) {
+	$cache = get_transient( SA_RANKING_TRANSIENTE );
+
+	if ( ! is_array( $cache ) || ! isset( $cache[ $clave ] ) || ! is_string( $cache[ $clave ] ) ) {
+		return null;
+	}
+
+	return $cache[ $clave ];
+}
+
+/**
+ * Devuelve el último HTML conocido, **aunque el TTL haya caducado**.
+ *
+ * @param string $clave Clave interna.
+ * @return string|null HTML de respaldo o null si nunca hubo uno.
+ */
+function sa_ranking_leer_respaldo( $clave ) {
+	$respaldo = get_transient( SA_RANKING_TRANSIENTE_RESPALDO );
+
+	if ( ! is_array( $respaldo ) || ! isset( $respaldo[ $clave ] ) || ! is_string( $respaldo[ $clave ] ) ) {
+		return null;
+	}
+
+	return $respaldo[ $clave ];
+}
+
+/**
+ * Guarda el HTML en el caché vigente y en el respaldo sin caducidad.
+ *
+ * @param string $clave Clave interna.
+ * @param string $html  Tabla ya construida y escapada.
+ */
+function sa_ranking_escribir_cache( $clave, $html ) {
+	$cache = get_transient( SA_RANKING_TRANSIENTE );
+	$cache = is_array( $cache ) ? $cache : array();
+	$cache[ $clave ] = $html;
+	set_transient( SA_RANKING_TRANSIENTE, $cache, sa_ranking_ttl() );
+
+	$respaldo = get_transient( SA_RANKING_TRANSIENTE_RESPALDO );
+	$respaldo = is_array( $respaldo ) ? $respaldo : array();
+	$respaldo[ $clave ] = $html;
+	// TTL 0 en WordPress = sin caducidad: es la copia de última instancia.
+	set_transient( SA_RANKING_TRANSIENTE_RESPALDO, $respaldo, 0 );
+}
+
+/**
+ * Borra ambos transients (caché vigente y respaldo).
+ *
+ * Idempotente: se usa al cambiar los ajustes para no servir datos de una
+ * API que ya no es la configurada.
+ */
+function sa_ranking_limpiar_cache() {
+	delete_transient( SA_RANKING_TRANSIENTE );
+	delete_transient( SA_RANKING_TRANSIENTE_RESPALDO );
+}
+
 /**
  * URL completa del endpoint público de ranking.
  *
@@ -153,6 +250,14 @@ function sa_ranking_construir_tabla( $datos ) {
 /**
  * Shortcode ``[ranking_table]``.
  *
+ * Flujo (secuencia 04_wordpress_ranking):
+ *
+ * 1. caché vivo en Transients → se sirve sin tocar el backend;
+ * 2. consulta ``GET /api/ranking`` → construye la tabla y la cachea;
+ * 3. backend caído → sirve el **respaldo** (última copia, avisando de que
+ *    está desactualizada);
+ * 4. sin datos previos → mensaje degradado.
+ *
  * Atributos opcionales:
  *
  * - ``community_id`` — comunidad a mostrar (por defecto 1, RNF006).
@@ -160,7 +265,7 @@ function sa_ranking_construir_tabla( $datos ) {
  *                      endpoint para no pedir más de lo permitido).
  *
  * @param array $atts Atributos del shortcode.
- * @return string HTML del ranking (tabla o mensaje de error).
+ * @return string HTML del ranking (tabla o mensaje).
  */
 function sa_ranking_shortcode( $atts ) {
 	$atts = shortcode_atts(
@@ -174,19 +279,42 @@ function sa_ranking_shortcode( $atts ) {
 
 	$comunidad  = max( 1, absint( $atts['community_id'] ) );
 	$por_pagina = min( 100, max( 1, absint( $atts['per_page'] ) ) );
+	$clave      = sa_ranking_clave( $comunidad, $por_pagina );
 
-	$datos = sa_ranking_consultar_api( $comunidad, $por_pagina );
-
-	if ( null === $datos ) {
-		return '<p class="sa-ranking-agotado" role="status">'
-			. esc_html__(
-				'El ranking no está disponible en este momento: no se pudo contactar con el servidor. Inténtalo de nuevo en unos minutos.',
-				'speculum-alae'
-			)
-			. '</p>';
+	// 1) Caché vigente: respuesta inmediata sin consultar el backend.
+	$cacheado = sa_ranking_leer_cache( $clave );
+	if ( null !== $cacheado ) {
+		return $cacheado;
 	}
 
-	return sa_ranking_construir_tabla( $datos );
+	// 2) Caché frío: se consulta el endpoint público.
+	$datos = sa_ranking_consultar_api( $comunidad, $por_pagina );
+	if ( null !== $datos ) {
+		$html = sa_ranking_construir_tabla( $datos );
+		sa_ranking_escribir_cache( $clave, $html );
+
+		return $html;
+	}
+
+	// 3) Backend caído: última tabla conocida, marcada como desactualizada.
+	$respaldo = sa_ranking_leer_respaldo( $clave );
+	if ( null !== $respaldo ) {
+		return '<p class="sa-ranking-desactualizado" role="status">'
+			. esc_html__(
+				'No se pudo actualizar el ranking: se muestra la última copia guardada.',
+				'speculum-alae'
+			)
+			. '</p>'
+			. $respaldo;
+	}
+
+	// 4) Nunca hubo datos: mensaje degradado.
+	return '<p class="sa-ranking-agotado" role="status">'
+		. esc_html__(
+			'El ranking no está disponible en este momento: no se pudo contactar con el servidor. Inténtalo de nuevo en unos minutos.',
+			'speculum-alae'
+		)
+		. '</p>';
 }
 
 add_shortcode( 'ranking_table', 'sa_ranking_shortcode' );

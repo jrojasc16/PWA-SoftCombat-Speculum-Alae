@@ -120,3 +120,75 @@ def test_el_plugin_usa_el_mismo_mensaje_vacio_que_la_vista_web():
     )
     assert "Todavía no hay combates confirmados" in plantilla
     assert "Todavía no hay combates confirmados" in codigo
+
+
+# ---------------------------------------------------------------------------
+# 11.2 — caché con Transients (TTL ~5 min) y mensaje degradado
+# ---------------------------------------------------------------------------
+
+
+def test_el_plugin_cachea_el_html_con_transients_de_wordpress():
+    codigo = _plugin()
+    assert "get_transient(" in codigo
+    assert "set_transient(" in codigo
+    # Dos transients: el vigente (con TTL) y el respaldo (sin caducidad).
+    assert "SA_RANKING_TRANSIENTE" in codigo
+    assert "SA_RANKING_TRANSIENTE_RESPALDO" in codigo
+
+
+def test_el_ttl_por_defecto_es_aproximadamente_5_minutos():
+    codigo = _plugin()
+    ttl = int(re.search(r"SA_RANKING_TTL_DEFECTO',\s*(\d+)", codigo).group(1))
+    assert ttl == 300, "el TTL debe ser ~5 minutos (300 s)"
+
+
+def test_el_cacheo_es_por_combinacion_de_comunidad_y_pagina():
+    """Cada shortcode con atributos distintos tiene su propia entrada."""
+    codigo = _plugin()
+    assert "function sa_ranking_clave( $comunidad, $por_pagina )" in codigo
+    assert "return $comunidad . 'x' . $por_pagina;" in codigo
+    # El respaldo sin caducidad usa TTL 0 (semántica de WordPress).
+    assert "set_transient( SA_RANKING_TRANSIENTE_RESPALDO, $respaldo, 0 );" in codigo
+
+
+def test_el_shortcode_sirve_la_cache_antes_de_consultar_el_backend():
+    """Orden del flujo: caché → API → respaldo → mensaje degradado."""
+    codigo = _plugin()
+    cuerpo = re.search(
+        r"function sa_ranking_shortcode\(.*?\n}", codigo, re.S
+    ).group(0)
+
+    pasos = [
+        cuerpo.find("sa_ranking_leer_cache"),
+        cuerpo.find("sa_ranking_consultar_api"),
+        cuerpo.find("sa_ranking_leer_respaldo"),
+        cuerpo.find("sa-ranking-agotado"),
+    ]
+    assert all(p >= 0 for p in pasos), f"pasos del flujo ausentes: {pasos}"
+    assert pasos == sorted(pasos), "el flujo del shortcode cambió de orden"
+
+
+def test_si_el_backend_no_responde_usa_el_respaldo_y_lo_marca():
+    codigo = _plugin()
+    assert "is_wp_error( $respuesta )" in codigo
+    assert "No se pudo actualizar el ranking: se muestra la última copia guardada." in codigo
+
+
+def test_sin_respaldo_devuelve_un_mensaje_degradado_legible():
+    codigo = _plugin()
+    assert "El ranking no está disponible en este momento" in codigo
+    assert 'role="status"' in codigo
+
+
+def test_el_plugin_pone_tope_a_la_espera_de_la_peticion():
+    """Un backend colgado no puede bloquear la página de WordPress."""
+    codigo = _plugin()
+    assert "SA_RANKING_TIMEOUT" in codigo
+    assert "'timeout'     => SA_RANKING_TIMEOUT" in codigo
+
+
+def test_hay_una_funcion_para_vaciar_la_caché():
+    codigo = _plugin()
+    assert "function sa_ranking_limpiar_cache()" in codigo
+    assert "delete_transient( SA_RANKING_TRANSIENTE );" in codigo
+    assert "delete_transient( SA_RANKING_TRANSIENTE_RESPALDO );" in codigo
