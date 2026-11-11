@@ -27,6 +27,27 @@ def client(app):
     return app.test_client()
 
 
+@pytest.fixture(autouse=True)
+def _usuario_fresco_por_peticion(app):
+    """Invalida la caché de Flask-Login entre peticiones (Sprint 12.3).
+
+    Flask-Login memoriza ``current_user`` en ``g._login_user`` y solo lo
+    recarga si la variable no existe. Como el fixture ``app`` mantiene un
+    único app context abierto durante todo el test, ``g`` se comparte entre
+    peticiones y entre clientes: sin esta limpieza, la petición de un cliente
+    reutilizaría el usuario que otro cliente dejó en caché en lugar de leer
+    su propia cookie de sesión. En producción cada petición recibe su propio
+    app context (y por tanto su propia ``g``); este hook reproduce ese
+    comportamiento para que las pruebas multi-sesión vean lo mismo que el
+    servidor real.
+    """
+    from flask import g
+
+    @app.before_request
+    def _limpiar_usuario_en_cache():
+        g.pop("_login_user", None)
+
+
 @pytest.fixture
 def roles(app):
     """Siembra los 4 roles fijos en la BD de pruebas (equivale a la migración de datos).
