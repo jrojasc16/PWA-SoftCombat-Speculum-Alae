@@ -68,11 +68,14 @@ Comando de verificación local: `cd prototype && ../venv/bin/python -m pytest -q
 
 ## Sprint 11 — Plugin WordPress + shortcode `[ranking_table]`
 
-- [ ] **11.1** `prototype/wordpress-plugin/ranking-table.php`: cabecera de plugin, registro del shortcode, consumo de `GET /api/ranking` con la HTTP API de WP (hoy el archivo solo tiene el docblock).
-- [ ] **11.2** Caché con **Transients** (TTL ≈ 5 min) y mensaje degradado si el backend no responde.
-- [ ] **11.3** Página de ajustes: URL base de la API + TTL.
-- [ ] **11.4** Escapado de toda salida (`esc_html`, `esc_attr`) y tabla HTML ordenada igual que la vista web.
-- [ ] **11.5** Prueba en un WordPress local/staging con datos reales del prototipo (y 11.6: apuntar el shortcode a producción en el Sprint 14).
+> **Estado: 11.1–11.3 completados (3 de 5 tareas = la mitad del sprint).** 11.4 y 11.5 pendientes.
+
+- [x] **11.1** `prototype/wordpress-plugin/ranking-table.php`: cabecera de plugin, registro del shortcode, consumo de `GET /api/ranking` con la HTTP API de WP → commit `0f6ac4b`. Shortcode `[ranking_table]` con atributos `community_id`/`per_page` (mismos límites que `shared/http.py`), tabla con las mismas columnas/orden/mensaje vacío que `templates/ranking.html`.
+- [x] **11.2** Caché con **Transients** (TTL ≈ 5 min) y mensaje degradado si el backend no responde → commit `8a7dd6e`. Flujo: caché vivo → API → **respaldo sin caducidad** (última copia marcada como desactualizada) → mensaje degradado; `timeout` de 5 s en la petición.
+- [x] **11.3** Página de ajustes: URL base de la API + TTL → commit `6290ccb` (`Ajustes → Ranking SA`, Settings API; URL solo http/https, TTL 0–86400 s con 0 = sin caché; al guardar se vacía el caché).
+- [ ] **11.4** Escapado de toda salida (`esc_html`, `esc_attr`) y tabla HTML ordenada igual que la vista web. — *El código ya escapa toda la salida y replica columnas/orden/mensaje vacío; falta la revisión formal (incluye comprobar visualmente contra la vista `/ranking`).*
+- [ ] **11.5** Prueba en un WordPress local/staging con datos reales del prototipo (y 11.6: apuntar el shortcode a producción en el Sprint 14). — *Requiere un WordPress del equipo; el entorno de desarrollo no tiene PHP.*
+- **Verificación parcial:** 26 tests de contrato en `prototype/tests/test_plugin_wordpress.py` (cabecera WP, shortcode, contrato de query string vs. `public_api/routes.py`, límites de paginación vs. `shared/http.py`, columnas vs. `ranking.html`, flujo de caché, sanitizadores, guardia `manage_options`). **383 tests en verde**, cobertura `app.modules.ranking` = 100 %. Sin `php -l` disponible en el entorno.
 
 ---
 
