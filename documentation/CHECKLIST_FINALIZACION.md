@@ -81,13 +81,14 @@ Comando de verificación local: `cd prototype && ../venv/bin/python -m pytest -q
 
 ## Sprint 12 — Pruebas integrales, carga y OpenAPI
 
-- [ ] **12.1** Completar `prototype/docs/openapi.yaml` (hoy es una línea de docstring) con **todos** los endpoints: auth, combates, confirmaciones, ranking público, admin, historial; esquemas y códigos de error.
-- [ ] **12.2** Validar el OpenAPI (linter/validador) y referenciarlo en el README.
-- [ ] **12.3** Suite de integración end-to-end: registro → reporte → confirmación dual → ranking actualizado → historial → endpoint público.
+- [x] **12.1** Completar `prototype/docs/openapi.yaml` (hoy es una línea de docstring) con **todos** los endpoints: auth, combates, confirmaciones, ranking público, admin, historial; esquemas y códigos de error. — commit `c1d19bc` (OpenAPI 3.0.3: 18 paths, 20 operaciones JSON, 25 esquemas; respuestas compartidas 400/401/403/404/409 → esquema `Error`; seguridad `sesionCookie` con `security: []` en los públicos).
+- [x] **12.2** Validar el OpenAPI (linter/validador) y referenciarlo en el README. — commit `d758a40` (`openapi-spec-validator` + `PyYAML` en `prototype/requirements.txt`; 17 tests en `tests/test_openapi.py` con el validador oficial + cross-checks contra `url_map` de Flask, enums, límites de `shared/http.py`, códigos de error y seguridad; sección «API REST (OpenAPI)» en el README).
+- [x] **12.3** Suite de integración end-to-end: registro → reporte → confirmación dual → ranking actualizado → historial → endpoint público. — commit `9a1c06a` (`tests/test_e2e.py`, 3 tests: flujo completo con idempotencia y códigos 409/400 de confirmación, conflicto resuelto por admin con bitácora y recálculo estable, 401 JSON sin redirección en 10 endpoints; `conftest.py` limpia `g._login_user` por petición para que cada cliente de pruebas vea su propia sesión).
 - [ ] **12.4** Script de semilla de datos: 100 usuarios + N combates confirmados.
 - [ ] **12.5** Prueba de carga sobre `GET /api/ranking` (`locust`/`ab`): **p95 < 500 ms con 100 usuarios** (RNF002) y documentar resultados.
 - [ ] **12.6** Revisión de seguridad: bcrypt costo 12 efectivo, cookies `Secure`/`HttpOnly`, HTTPS forzado en producción, sin datos sensibles en respuestas públicas.
 - [ ] **12.7** Confirmar cobertura Elo ≥ 70 % (hoy 100 %) con `scripts/check.sh` y artefactos de CI.
+- **Verificación parcial:** `scripts/check.sh` en verde (**403 tests**, cobertura `app.modules.ranking` = 100 %); spec validado por `openapi-spec-validator` en la suite (17 tests) y suite e2e de 3 tests en verde. **Estado: 12.1–12.3 completados (3 de 7).**
 
 ---
 
