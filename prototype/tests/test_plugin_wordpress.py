@@ -192,3 +192,87 @@ def test_hay_una_funcion_para_vaciar_la_caché():
     assert "function sa_ranking_limpiar_cache()" in codigo
     assert "delete_transient( SA_RANKING_TRANSIENTE );" in codigo
     assert "delete_transient( SA_RANKING_TRANSIENTE_RESPALDO );" in codigo
+
+
+# ---------------------------------------------------------------------------
+# 11.3 — página de ajustes (URL base de la API + TTL)
+# ---------------------------------------------------------------------------
+
+
+def test_el_plugin_expone_una_pagina_de_ajustes_en_el_admin():
+    codigo = _plugin()
+    assert "add_action( 'admin_menu', 'sa_ranking_registrar_pagina_ajustes' );" in codigo
+    assert "add_options_page(" in codigo
+    assert "add_action( 'admin_init', 'sa_ranking_registrar_ajustes' );" in codigo
+
+
+def test_los_ajustes_registran_la_url_base_y_el_ttl_con_settings_api():
+    codigo = _plugin()
+    assert "register_setting(\n\t\t'sa_ranking_grupo',\n\t\t'sa_ranking_api_base'," in codigo
+    assert "register_setting(\n\t\t'sa_ranking_grupo',\n\t\t'sa_ranking_ttl'," in codigo
+    assert "add_settings_field(" in codigo
+    # La página usa el formulario estándar de WordPress.
+    assert 'action="options.php"' in codigo
+    assert "settings_fields( 'sa_ranking_grupo' );" in codigo
+
+
+def test_la_url_base_de_los_ajustes_alimenta_al_shortcode():
+    """Cambiar la URL en Ajustes debe cambiar a dónde se conecta el plugin."""
+    codigo = _plugin()
+    cuerpo = re.search(
+        r"function sa_ranking_url_api\(.*?\n}", codigo, re.S
+    ).group(0)
+    assert "get_option( 'sa_ranking_api_base', SA_RANKING_API_DEFECTO )" in cuerpo
+    # La ruta del endpoint se añade a la base (sin barra final duplicada).
+    assert "rtrim( $base, '/' ) . '/api/ranking'" in cuerpo
+
+
+def test_el_ttl_de_los_ajustes_se_usa_en_el_cacheo_y_esta_acotado():
+    codigo = _plugin()
+    cuerpo = re.search(r"function sa_ranking_ttl\(.*?\n}", codigo, re.S).group(0)
+    assert "get_option( 'sa_ranking_ttl', SA_RANKING_TTL_DEFECTO )" in cuerpo
+    assert "SA_RANKING_TTL_MAXIMO" in cuerpo
+    # Cota superior: 24 h.
+    maximo = int(re.search(r"SA_RANKING_TTL_MAXIMO',\s*(\d+)", codigo).group(1))
+    assert maximo == 86400
+
+
+def test_sanitizar_url_rechaza_esquemas_distintos_de_http_y_https():
+    codigo = _plugin()
+    cuerpo = re.search(
+        r"function sa_ranking_sanitizar_url\(.*?\n}", codigo, re.S
+    ).group(0)
+    assert "esc_url_raw( $valor, array( 'http', 'https' ) )" in cuerpo
+    assert "untrailingslashit( $valor )" in cuerpo
+    # Ante un valor vacío o inválido se vuelve al valor por defecto.
+    assert "return SA_RANKING_API_DEFECTO;" in cuerpo
+
+
+def test_sanitizar_ttl_acota_entre_cero_y_un_dia():
+    codigo = _plugin()
+    cuerpo = re.search(r"function sa_ranking_sanitizar_ttl\(.*?\n}", codigo, re.S).group(0)
+    assert "return 0;" in cuerpo
+    assert "return SA_RANKING_TTL_MAXIMO;" in cuerpo
+
+
+def test_guardar_un_ajuste_vacia_la_caché():
+    codigo = _plugin()
+    assert "add_action( 'update_option_sa_ranking_api_base', 'sa_ranking_limpiar_cache' );" in codigo
+    assert "add_action( 'update_option_sa_ranking_ttl', 'sa_ranking_limpiar_cache' );" in codigo
+
+
+def test_con_ttl_cero_el_plugin_no_cachea_y_consulta_siempre():
+    """TTL 0 = sin caché: ni lectura ni escritura de transients."""
+    codigo = _plugin()
+    leer = re.search(r"function sa_ranking_leer_cache\(.*?\n}", codigo, re.S).group(0)
+    escribir = re.search(r"function sa_ranking_escribir_cache\(.*?\n}", codigo, re.S).group(0)
+    assert "if ( sa_ranking_ttl() <= 0 )" in leer
+    assert "if ( sa_ranking_ttl() <= 0 )" in escribir
+
+
+def test_la_pagina_de_ajustes_solo_es_visible_para_administradores():
+    codigo = _plugin()
+    cuerpo = re.search(
+        r"function sa_ranking_pintar_ajustes\(.*?\n}", codigo, re.S
+    ).group(0)
+    assert "current_user_can( 'manage_options' )" in cuerpo

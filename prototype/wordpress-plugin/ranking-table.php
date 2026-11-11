@@ -27,6 +27,9 @@ define( 'SA_RANKING_API_DEFECTO', 'http://127.0.0.1:5000' );
 /** Caché por defecto del shortcode: ~5 minutos (segundos). */
 define( 'SA_RANKING_TTL_DEFECTO', 300 );
 
+/** Caché máxima admisible: 24 horas (segundos). */
+define( 'SA_RANKING_TTL_MAXIMO', 86400 );
+
 /** Segundos de espera máxima por petición al backend. */
 define( 'SA_RANKING_TIMEOUT', 5 );
 
@@ -42,13 +45,23 @@ define( 'SA_RANKING_TRANSIENTE_RESPALDO', 'sa_ranking_respaldo' );
 /**
  * TTL efectivo del caché (segundos).
  *
- * Por defecto son los ~5 minutos del diseño (RNF004/RF12); el valor
- * configurable desde los ajustes se añade en la tarea 11.3.
+ * Lee el ajuste ``sa_ranking_ttl`` (por defecto ~5 minutos, RNF004/RF12)
+ * y lo acota al rango 0..24 h. Un TTL de 0 desactiva el caché: el shortcode
+ * consulta la API en cada vista y no guarda copias.
  *
- * @return int Segundos (>= 0).
+ * @return int Segundos (0..SA_RANKING_TTL_MAXIMO).
  */
 function sa_ranking_ttl() {
-	return SA_RANKING_TTL_DEFECTO;
+	$ttl = (int) get_option( 'sa_ranking_ttl', SA_RANKING_TTL_DEFECTO );
+
+	if ( $ttl < 0 ) {
+		return 0;
+	}
+	if ( $ttl > SA_RANKING_TTL_MAXIMO ) {
+		return SA_RANKING_TTL_MAXIMO;
+	}
+
+	return $ttl;
 }
 
 /**
@@ -72,6 +85,11 @@ function sa_ranking_clave( $comunidad, $por_pagina ) {
  * @return string|null HTML o null si no hay caché vigente.
  */
 function sa_ranking_leer_cache( $clave ) {
+	// TTL 0 = caché desactivado desde los ajustes.
+	if ( sa_ranking_ttl() <= 0 ) {
+		return null;
+	}
+
 	$cache = get_transient( SA_RANKING_TRANSIENTE );
 
 	if ( ! is_array( $cache ) || ! isset( $cache[ $clave ] ) || ! is_string( $cache[ $clave ] ) ) {
@@ -100,10 +118,17 @@ function sa_ranking_leer_respaldo( $clave ) {
 /**
  * Guarda el HTML en el caché vigente y en el respaldo sin caducidad.
  *
+ * Con TTL 0 no se guarda nada (ajuste «sin caché»): ni la tabla vigente ni
+ * el respaldo, de modo que la opción significa «consultar siempre».
+ *
  * @param string $clave Clave interna.
  * @param string $html  Tabla ya construida y escapada.
  */
 function sa_ranking_escribir_cache( $clave, $html ) {
+	if ( sa_ranking_ttl() <= 0 ) {
+		return;
+	}
+
 	$cache = get_transient( SA_RANKING_TRANSIENTE );
 	$cache = is_array( $cache ) ? $cache : array();
 	$cache[ $clave ] = $html;
@@ -130,7 +155,8 @@ function sa_ranking_limpiar_cache() {
 /**
  * URL completa del endpoint público de ranking.
  *
- * Une la URL base configurada con la ruta del endpoint y añade los
+ * Une la URL base guardada en los ajustes (``sa_ranking_api_base``, por
+ * defecto la del prototipo local) con la ruta del endpoint y añade los
  * parámetros que el backend conoce (``community_id`` para el aislamiento
  * por comunidad RNF006 y ``per_page`` para acotar la respuesta).
  *
@@ -139,7 +165,9 @@ function sa_ranking_limpiar_cache() {
  * @return string URL lista para wp_remote_get().
  */
 function sa_ranking_url_api( $comunidad, $por_pagina ) {
-	$url = rtrim( SA_RANKING_API_DEFECTO, '/' ) . '/api/ranking';
+	$base = get_option( 'sa_ranking_api_base', SA_RANKING_API_DEFECTO );
+	$base = is_string( $base ) && '' !== trim( $base ) ? trim( $base ) : SA_RANKING_API_DEFECTO;
+	$url  = rtrim( $base, '/' ) . '/api/ranking';
 
 	return add_query_arg(
 		array(
@@ -318,3 +346,181 @@ function sa_ranking_shortcode( $atts ) {
 }
 
 add_shortcode( 'ranking_table', 'sa_ranking_shortcode' );
+
+// ---------------------------------------------------------------------------
+// Ajustes del plugin (tarea 11.3): URL base de la API y TTL del caché.
+// ---------------------------------------------------------------------------
+
+add_action( 'admin_menu', 'sa_ranking_registrar_pagina_ajustes' );
+add_action( 'admin_init', 'sa_ranking_registrar_ajustes' );
+// Al cambiar la configuración se vacía el caché para no servir datos de una
+// API que ya no es la configurada.
+add_action( 'update_option_sa_ranking_api_base', 'sa_ranking_limpiar_cache' );
+add_action( 'update_option_sa_ranking_ttl', 'sa_ranking_limpiar_cache' );
+
+/**
+ * Crea la página de ajustes dentro de Ajustes → Ranking SA.
+ */
+function sa_ranking_registrar_pagina_ajustes() {
+	add_options_page(
+		__( 'Ranking Speculum-Alae', 'speculum-alae' ),
+		__( 'Ranking SA', 'speculum-alae' ),
+		'manage_options',
+		'sa-ranking-table',
+		'sa_ranking_pintar_ajustes'
+	);
+}
+
+/**
+ * Registra las dos opciones con la Settings API de WordPress.
+ */
+function sa_ranking_registrar_ajustes() {
+	register_setting(
+		'sa_ranking_grupo',
+		'sa_ranking_api_base',
+		array(
+			'type'              => 'string',
+			'sanitize_callback' => 'sa_ranking_sanitizar_url',
+			'default'           => SA_RANKING_API_DEFECTO,
+		)
+	);
+
+	register_setting(
+		'sa_ranking_grupo',
+		'sa_ranking_ttl',
+		array(
+			'type'              => 'integer',
+			'sanitize_callback' => 'sa_ranking_sanitizar_ttl',
+			'default'           => SA_RANKING_TTL_DEFECTO,
+		)
+	);
+
+	add_settings_section(
+		'sa_ranking_seccion',
+		__( 'Conexión con el backend', 'speculum-alae' ),
+		'__return_false',
+		'sa-ranking-table'
+	);
+
+	add_settings_field(
+		'sa_ranking_api_base',
+		__( 'URL base de la API', 'speculum-alae' ),
+		'sa_ranking_campo_url',
+		'sa-ranking-table',
+		'sa_ranking_seccion'
+	);
+
+	add_settings_field(
+		'sa_ranking_ttl',
+		__( 'Caché del ranking (segundos)', 'speculum-alae' ),
+		'sa_ranking_campo_ttl',
+		'sa-ranking-table',
+		'sa_ranking_seccion'
+	);
+}
+
+/**
+ * Sanea la URL base: solo http/https, sin barra final y con valor de defecto.
+ *
+ * @param mixed $valor Valor crudo del formulario.
+ * @return string URL válida.
+ */
+function sa_ranking_sanitizar_url( $valor ) {
+	$valor = is_string( $valor ) ? trim( $valor ) : '';
+	$valor = esc_url_raw( $valor, array( 'http', 'https' ) );
+
+	if ( '' === $valor ) {
+		return SA_RANKING_API_DEFECTO;
+	}
+
+	return untrailingslashit( $valor );
+}
+
+/**
+ * Sanea el TTL: entero entre 0 (sin caché) y 24 horas.
+ *
+ * @param mixed $valor Valor crudo del formulario.
+ * @return int Segundos acotados.
+ */
+function sa_ranking_sanitizar_ttl( $valor ) {
+	$valor = (int) $valor;
+
+	if ( $valor < 0 ) {
+		return 0;
+	}
+	if ( $valor > SA_RANKING_TTL_MAXIMO ) {
+		return SA_RANKING_TTL_MAXIMO;
+	}
+
+	return $valor;
+}
+
+/**
+ * Campo de formulario: URL base de la API.
+ */
+function sa_ranking_campo_url() {
+	$url = get_option( 'sa_ranking_api_base', SA_RANKING_API_DEFECTO );
+	$url = is_string( $url ) && '' !== trim( $url ) ? trim( $url ) : SA_RANKING_API_DEFECTO;
+
+	// Solo se admite http/https (el resto → valor por defecto).
+	$esquema = wp_parse_url( $url, PHP_URL_SCHEME );
+	if ( ! in_array( $esquema, array( 'http', 'https' ), true ) ) {
+		$url = SA_RANKING_API_DEFECTO;
+	}
+
+	printf(
+		'<input type="url" id="sa_ranking_api_base" name="sa_ranking_api_base" value="%s" class="regular-text" placeholder="%s" />',
+		esc_attr( $url ),
+		esc_attr( SA_RANKING_API_DEFECTO )
+	);
+
+	printf(
+		'<p class="description">%s</p>',
+		esc_html__(
+			'Ej.: https://speculum-alae.example.com — el plugin añade /api/ranking. En producción el backend debe responder por HTTPS.',
+			'speculum-alae'
+		)
+	);
+}
+
+/**
+ * Campo de formulario: TTL del caché.
+ */
+function sa_ranking_campo_ttl() {
+	$ttl = sa_ranking_ttl();
+
+	printf(
+		'<input type="number" id="sa_ranking_ttl" name="sa_ranking_ttl" value="%d" min="0" max="%d" step="1" class="small-text" />',
+		$ttl,
+		SA_RANKING_TTL_MAXIMO
+	);
+
+	printf(
+		'<p class="description">%s</p>',
+		esc_html__(
+			'Segundos antes de volver a consultar la API (300 = 5 minutos, el valor por defecto). 0 desactiva el caché: siempre se consulta y no se guarda copia de respaldo.',
+			'speculum-alae'
+		)
+	);
+}
+
+/**
+ * Pinta la página de ajustes (solo para administradores).
+ */
+function sa_ranking_pintar_ajustes() {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		return;
+	}
+	?>
+	<div class="wrap">
+		<h1><?php echo esc_html( get_admin_page_title() ); ?></h1>
+		<form action="options.php" method="post">
+			<?php
+			settings_fields( 'sa_ranking_grupo' );
+			do_settings_sections( 'sa-ranking-table' );
+			submit_button();
+			?>
+		</form>
+	</div>
+	<?php
+}
