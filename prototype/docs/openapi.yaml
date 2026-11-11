@@ -1,1 +1,1100 @@
-"""Especificación OpenAPI 3 de la API REST (RNF007)."""
+openapi: 3.0.3
+info:
+  title: API de Speculum-Alae (PWA SoftCombat)
+  version: 1.0.0
+  description: |
+    Contrato de la API REST del prototipo Flask que sirve la PWA de ranking Elo
+    de la comunidad SoftCombat Speculum-Alae (RNF007: API documentada con
+    OpenAPI).
+
+    ## Convenciones comunes
+
+    - **Transporte**: JSON (también se admite `application/x-www-form-urlencoded`
+      en los endpoints que usa la web, para que los `<form>` puedan llamarlos).
+    - **Sesión**: cookie `session` de Flask-Login (HttpOnly, `SameSite=Lax`;
+      `Secure` en producción — RNF001). Se autentica con `POST /auth/login` y se
+      cierra con `POST /auth/logout`. No hay tokens Bearer en el MVP (decisión
+      cerrada: sesiones Flask-Login, sin JWT).
+    - **Errores**: todos los errores de negocio responden `{"error": "<mensaje>"}`
+      con uno de los códigos 400 / 401 / 403 / 404 / 409. Las respuestas de
+      error siempre usan el esquema `Error`.
+    - **Multi-comunidad (RNF006)**: los endpoints de administración operan
+      siempre sobre la comunidad del usuario autenticado; `GET /api/ranking` y
+      `GET /me/history` aceptan el filtro de comunidad o el propio usuario.
+    - **Idempotencia (RF5)**: `POST /combats` acepta `client_request_id`; si la
+      clave ya existía devuelve `200` con el combate original en vez de crear
+      otro (los reenvíos offline no duplican combates).
+  license:
+    name: GPL-2.0-or-later
+    url: https://www.gnu.org/licenses/gpl-2.0.html
+  contact:
+    name: Equipo Speculum-Alae — Ingeniería de Software II
+    url: https://github.com/jrojasc16/PWA-SoftCombat-Speculum-Alae
+
+servers:
+  - url: http://127.0.0.1:5000
+    description: Prototipo local (desarrollo)
+  - url: /
+    description: Despliegue de la app (siempre sobre HTTPS en producción)
+
+tags:
+  - name: Salud
+    description: Comprobación de vida del servicio.
+  - name: Autenticación
+    description: Registro, inicio y cierre de sesión.
+  - name: Mi cuenta
+    description: Perfil, directorio de mi comunidad e historial propio.
+  - name: Combates
+    description: Reporte, consulta y confirmación de combates (RF5-RF8).
+  - name: Administración
+    description: Gestión de usuarios, resolución de conflictos y auditoría (RBAC).
+  - name: Ranking
+    description: Ranking público cacheado (RNF002/RNF004) y recálculo manual.
+
+paths:
+  /health:
+    get:
+      tags: [Salud]
+      operationId: obtenerSalud
+      summary: Comprobación de vida
+      description: Respuesta mínima sin autenticación, útil para despliegue y smoke tests.
+      security: []
+      responses:
+        "200":
+          description: El servicio está vivo.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Salud"
+              example:
+                status: ok
+                env: development
+
+  /auth/register:
+    post:
+      tags: [Autenticación]
+      operationId: registrarUsuario
+      summary: Registra una cuenta nueva y abre su sesión
+      description: |
+        Crea la cuenta con rol `jugador` en la comunidad 1 y deja la sesión
+        iniciada en la misma respuesta (flujo de un paso de la PWA).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Registro"
+            example:
+              email: ana@speculum-alae.test
+              password: password123
+              name: Ana Rojas
+      responses:
+        "201":
+          description: Cuenta creada y sesión iniciada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Usuario"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflicto"
+
+  /auth/login:
+    post:
+      tags: [Autenticación]
+      operationId: iniciarSesion
+      summary: Inicia sesión con correo y contraseña
+      description: |
+        Devuelve el perfil y establece la cookie de sesión `session` (HttpOnly).
+        Una cuenta desactivada no puede iniciar sesión.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Credenciales"
+            example:
+              email: ana@speculum-alae.test
+              password: password123
+      responses:
+        "200":
+          description: Sesión iniciada (cookie `session` en la respuesta).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Usuario"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+
+  /auth/logout:
+    post:
+      tags: [Autenticación]
+      operationId: cerrarSesion
+      summary: Cierra la sesión actual
+      responses:
+        "200":
+          description: Sesión cerrada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Mensaje"
+              example:
+                message: Sesión cerrada.
+        "401":
+          description: |
+            Sin sesión. En este endpoint concreto la respuesta la emite
+            Flask-Login (página HTML de error, sin cuerpo JSON); el resto de la
+            API responde siempre el esquema `Error`.
+
+  /me:
+    get:
+      tags: [Mi cuenta]
+      operationId: obtenerPerfil
+      summary: Perfil del usuario autenticado
+      responses:
+        "200":
+          description: Perfil del usuario de la sesión.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Usuario"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+
+  /me/community:
+    get:
+      tags: [Mi cuenta]
+      operationId: obtenerDirectorioComunidad
+      summary: Directorio mínimo de mi comunidad
+      description: |
+        Resuelve **nombre → id** para los formularios de reporte sin publicar
+        correos: solo `id` y `name`. Los usuarios desactivados no aparecen.
+      responses:
+        "200":
+          description: Mi comunidad (yo, jugadores y árbitros).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Directorio"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+
+  /me/history:
+    get:
+      tags: [Mi cuenta]
+      operationId: obtenerMiHistorial
+      summary: Mis combates con variación de índice
+      description: Solo el historial propio, del combate más reciente al más antiguo.
+      parameters:
+        - $ref: "#/components/parameters/Pagina"
+        - $ref: "#/components/parameters/PorPagina"
+      responses:
+        "200":
+          description: Historial paginado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Historial"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+
+  /combats:
+    post:
+      tags: [Combates]
+      operationId: reportarCombate
+      summary: Reporta un combate (queda PENDIENTE)
+      description: |
+        Solo puede reportar un participante o un árbitro de la misma comunidad.
+        El reporte **no** cuenta como confirmación: un combate lo cierran dos
+        confirmaciones de sus participantes o el árbitro asignado.
+
+        Si se repite `client_request_id` la respuesta es `200` con el combate
+        original (idempotencia de la cola offline).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReporteCombate"
+            example:
+              participants: [2, 3]
+              winner: 2
+              played_at: "2026-11-10T18:30:00"
+              referee_id: 4
+              client_request_id: "0f6ac4b-1"
+      responses:
+        "201":
+          description: Combate creado en estado PENDIENTE.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Combate"
+        "200":
+          description: Combate ya existente para esa `client_request_id` (sin duplicar).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Combate"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+
+  /combats/pending:
+    get:
+      tags: [Combates]
+      operationId: listarCombatesPendientes
+      summary: Combates PENDIENTE que me tocan confirmar
+      description: Soy participante o árbitro del combate.
+      responses:
+        "200":
+          description: Lista de combates pendientes (vacía si no hay).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Combate"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+
+  /combats/{combat_id}:
+    parameters:
+      - $ref: "#/components/parameters/CombatId"
+    get:
+      tags: [Combates]
+      operationId: obtenerCombate
+      summary: Detalle de un combate
+      responses:
+        "200":
+          description: El combate.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Combate"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+
+  /combats/{combat_id}/confirm:
+    parameters:
+      - $ref: "#/components/parameters/CombatId"
+    post:
+      tags: [Combates]
+      operationId: confirmarCombate
+      summary: Registra mi confirmación del combate (RF8)
+      description: |
+        - Dos confirmaciones coincidentes → `CONFIRMADO` (y el Elo se recalcula
+          on-write, RNF008).
+        - Dos distintas → `CONFLICTO`, que resuelve el árbitro o un admin.
+        - Si soy el árbitro asignado, mi confirmación cierra el combate y
+          prevalece sobre las de los participantes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Confirmacion"
+            example:
+              winner_id: 2
+      responses:
+        "200":
+          description: Confirmación registrada; el combate refleja el nuevo estado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Combate"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          $ref: "#/components/responses/Conflicto"
+
+  /admin/users:
+    get:
+      tags: [Administración]
+      operationId: listarUsuariosAdmin
+      summary: Usuarios de mi comunidad (panel de administración)
+      description: Requiere rol `admin` o `super_admin` (403 para el resto).
+      parameters:
+        - name: incluir_inactivos
+          in: query
+          required: false
+          description: "Por defecto se incluyen las cuentas desactivadas (`1`); con `0` se omiten."
+          schema:
+            type: string
+            enum: ["0", "1"]
+            default: "1"
+      responses:
+        "200":
+          description: "Lista de usuarios de la comunidad (incluye correos: es una vista privada)."
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UsuarioAdmin"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/SinPermisos"
+
+  /admin/users/{user_id}:
+    parameters:
+      - $ref: "#/components/parameters/UserId"
+    patch:
+      tags: [Administración]
+      operationId: actualizarUsuarioAdmin
+      summary: Activa/desactiva una cuenta o cambia su rol (UC10/UC11)
+      description: |
+        Reglas: solo `admin`/`super_admin`, solo de la **misma comunidad**
+        (RNF006), nadie desactiva ni cambia su propio rol, y solo un
+        `super_admin` concede o quita `super_admin` (sin escalamiento de
+        privilegios).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CambioUsuario"
+            example:
+              active: false
+      responses:
+        "200":
+          description: Usuario actualizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsuarioAdmin"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/SinPermisos"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+    post:
+      tags: [Administración]
+      operationId: actualizarUsuarioAdminFormulario
+      summary: Igual que PATCH, para formularios web
+      description: |
+        Alias de `PATCH /admin/users/{user_id}` porque un `<form>` HTML no puede
+        enviar métodos distintos de GET/POST. Mismo cuerpo y mismas respuestas.
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/CambioUsuario"
+      responses:
+        "200":
+          description: Usuario actualizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsuarioAdmin"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/SinPermisos"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+
+  /admin/combats:
+    get:
+      tags: [Administración]
+      operationId: listarCombatesAdmin
+      summary: Combates de mi comunidad para el panel
+      description: Misma proyección que la página `/admin/panel/combates`.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Filtra por estado (en el panel, por defecto se pide `CONFLICTO`).
+          schema:
+            $ref: "#/components/schemas/EstadoCombate"
+      responses:
+        "200":
+          description: Lista de combates de la comunidad.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CombateAdmin"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/SinPermisos"
+
+  /admin/combats/{combat_id}:
+    parameters:
+      - $ref: "#/components/parameters/CombatId"
+    patch:
+      tags: [Administración]
+      operationId: editarCombateAdmin
+      summary: Edición manual de un combate con auditoría (RF9/RNF008)
+      description: |
+        Campos editables: `winner_id`, `played_at` y `referee_id`. Cada campo
+        modado genera una entrada en `AuditLog` y el combate queda en estado
+        `RESUELTO`. Sirve también para resolver un `CONFLICTO`. Solo `admin` o
+        `super_admin` de la misma comunidad.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EdicionCombate"
+            example:
+              winner_id: 3
+              played_at: "2026-11-10T18:30:00"
+      responses:
+        "200":
+          description: Combate editado (proyección pública del combate).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Combate"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/SinPermisos"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+    post:
+      tags: [Administración]
+      operationId: editarCombateAdminFormulario
+      summary: Igual que PATCH, para formularios web
+      description: |
+        Alias de `PATCH /admin/combats/{combat_id}` para los `<form>` del panel;
+        los campos que empiezan por `_` (p. ej. `_method`) se ignoran.
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/EdicionCombate"
+      responses:
+        "200":
+          description: Combate editado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Combate"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/SinPermisos"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+
+  /admin/combats/{combat_id}/audit:
+    parameters:
+      - $ref: "#/components/parameters/CombatId"
+    get:
+      tags: [Administración]
+      operationId: obtenerAuditoriaCombate
+      summary: Bitácora de auditoría de un combate (RNF008/UC12)
+      description: |
+        Una entrada por campo modificado por un administrador, con valor
+        anterior y nuevo. Solo se puede consultar la bitácora de los combates
+        de la comunidad del administrador (RNF006).
+      responses:
+        "200":
+          description: Entradas de la bitácora, en orden cronológico.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Auditoria"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/SinPermisos"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+
+  /admin/ranking/recalculate:
+    post:
+      tags: [Administración]
+      operationId: recalcularRanking
+      summary: Recálculo manual del ranking de mi comunidad (RNF008)
+      description: |
+        Borra y replaya los combates terminales de la comunidad en orden
+        cronológico en una única transacción. Invalida la caché pública
+        (`GET /api/ranking`) al terminar.
+      responses:
+        "200":
+          description: Ranking reconstruido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Recalculo"
+              example:
+                community_id: 1
+                combats_processed: 12
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/SinPermisos"
+
+  /api/ranking:
+    get:
+      tags: [Ranking]
+      operationId: obtenerRankingPublico
+      summary: Ranking público, paginado y cacheado (RNF002/RNF004)
+      description: |
+        Endpoint **público** (sin sesión) pensado para la PWA, el shortcode de
+        WordPress y cualquier otra web. Nunca expone correos ni identificadores
+        internos: solo posición, nombre, puntos y nº de combates. Responde con
+        `Cache-Control: public, max-age=<TTL>` y se sirve de una caché en
+        memoria que se invalida con cada recálculo.
+
+        <500 ms con 100 usuarios concurrentes (RNF002). Preparado para API key
+        futura: hoy no exige credenciales.
+      security: []
+      parameters:
+        - name: community_id
+          in: query
+          required: false
+          description: Comunidad a consultar (RNF006).
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - $ref: "#/components/parameters/Pagina"
+        - $ref: "#/components/parameters/PorPagina"
+      responses:
+        "200":
+          description: Página del ranking ordenada por puntos descendentes.
+          headers:
+            Cache-Control:
+              description: TTL de la caché en segundos (0 en pruebas).
+              schema:
+                type: string
+                example: public, max-age=300
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ranking"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+components:
+  securitySchemes:
+    sesionCookie:
+      type: apiKey
+      in: cookie
+      name: session
+      description: |
+        Cookie de sesión de Flask-Login. Se obtiene con `POST /auth/login`;
+        es `HttpOnly` y `SameSite=Lax` (y `Secure` en producción, RNF001).
+
+  parameters:
+    Pagina:
+      name: page
+      in: query
+      required: false
+      description: Página 1-based.
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PorPagina:
+      name: per_page
+      in: query
+      required: false
+      description: Tamaño de página (límites compartidos por todos los endpoints con página).
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+    UserId:
+      name: user_id
+      in: path
+      required: true
+      description: Identificador del usuario.
+      schema:
+        type: integer
+        minimum: 1
+    CombatId:
+      name: combat_id
+      in: path
+      required: true
+      description: Identificador del combate.
+      schema:
+        type: integer
+        minimum: 1
+
+  responses:
+    BadRequest:
+      description: Petición inválida (regla de negocio o parámetro fuera de rango).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: "El parámetro 'per_page' debe ser entre 1 y 100."
+    NoAutenticado:
+      description: Sesión requerida o credenciales inválidas.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: Autenticación requerida.
+    SinPermisos:
+      description: Autenticado pero con un rol insuficiente (RBAC de roles fijos).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: No tienes permisos para esta acción.
+    NoEncontrado:
+      description: Recurso inexistente (o de otra comunidad, RNF006).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: No existe el combate 999.
+    Conflicto:
+      description: Conflicto de estado (duplicidad o confirmación repetida).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: Ya existe una cuenta registrada con ese correo.
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      description: Contrato único de errores de toda la API.
+      properties:
+        error:
+          type: string
+          description: Mensaje legible en español.
+      example:
+        error: Credenciales inválidas.
+
+    Mensaje:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+
+    Salud:
+      type: object
+      required: [status, env]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        env:
+          type: string
+          description: Entorno de configuración (development, testing, production).
+
+    Registro:
+      type: object
+      required: [email, password, name]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+          writeOnly: true
+        name:
+          type: string
+          minLength: 2
+
+    Credenciales:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          writeOnly: true
+
+    Rol:
+      type: string
+      enum: [jugador, arbitro, admin, super_admin]
+      description: Roles fijos de la tabla `roles` (MVP sin roles dinámicos).
+
+    Usuario:
+      type: object
+      required: [id, email, name, role, community_id]
+      description: Perfil del usuario autenticado (proyección sin hash de contraseña).
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        role:
+          $ref: "#/components/schemas/Rol"
+        community_id:
+          type: integer
+
+    UsuarioAdmin:
+      type: object
+      required: [id, name, email, role, active, community_id]
+      description: "Usuario para el panel de administración (incluye el correo: vista privada)."
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          $ref: "#/components/schemas/Rol"
+        active:
+          type: boolean
+        community_id:
+          type: integer
+
+    CambioUsuario:
+      type: object
+      description: Se debe enviar exactamente uno de los dos campos.
+      minProperties: 1
+      maxProperties: 1
+      properties:
+        active:
+          type: boolean
+          description: Activa o desactiva la cuenta (no sobre la propia).
+        role:
+          type: string
+          description: Nombre de un rol existente (no sobre el propio; `super_admin` solo lo concede un `super_admin`).
+
+    Miembro:
+      type: object
+      required: [id, name]
+      description: Entrada del directorio de comunidad (nunca lleva correo).
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+
+    Directorio:
+      type: object
+      required: [community_id, yo, jugadores, arbitros]
+      properties:
+        community_id:
+          type: integer
+        yo:
+          $ref: "#/components/schemas/Miembro"
+        jugadores:
+          type: array
+          items:
+            $ref: "#/components/schemas/Miembro"
+        arbitros:
+          type: array
+          items:
+            $ref: "#/components/schemas/Miembro"
+
+    EstadoCombate:
+      type: string
+      enum: [PENDIENTE, CONFIRMADO, CONFLICTO, RESUELTO]
+      description: |
+        Máquina de estados (RF6/RF7): PENDIENTE cierra en CONFIRMADO (dos
+        confirmaciones iguales o el árbitro) o CONFLICTO (discrepantes);
+        RESUELTO es el único estado terminal (edición admin).
+
+    ResultadoParticipante:
+      type: string
+      enum: [VICTORIA, DERROTA]
+      description: No hay empates en la fórmula Elo (Art. 30).
+
+    Participante:
+      type: object
+      required: [user_id, name, result]
+      properties:
+        user_id:
+          type: integer
+        name:
+          type: string
+        result:
+          $ref: "#/components/schemas/ResultadoParticipante"
+
+    Combate:
+      type: object
+      required: [id, community_id, status, reporter_id, referee_id, played_at, processed, created_at, participants]
+      properties:
+        id:
+          type: integer
+        community_id:
+          type: integer
+        status:
+          $ref: "#/components/schemas/EstadoCombate"
+        reporter_id:
+          type: integer
+          nullable: true
+          description: Usuario que reportó el combate.
+        referee_id:
+          type: integer
+          nullable: true
+          description: Árbitro asignado; su confirmación prevalece en conflicto.
+        played_at:
+          type: string
+          format: date-time
+          description: Fecha de juego en ISO-8601 (se guarda en UTC).
+        processed:
+          type: boolean
+          description: Indicador idempotente de que el Elo ya se recalculó (RNF008).
+        created_at:
+          type: string
+          format: date-time
+        participants:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items:
+            $ref: "#/components/schemas/Participante"
+
+    CombateAdmin:
+      allOf:
+        - $ref: "#/components/schemas/Combate"
+        - type: object
+          description: "Proyección privada del panel: añade ganador y nombres."
+          required: [winner_id, reporter_name, referee_name]
+          properties:
+            winner_id:
+              type: integer
+              nullable: true
+              description: Ganador declarado (lo fija el reporte o la resolución).
+            reporter_name:
+              type: string
+              nullable: true
+            referee_name:
+              type: string
+              nullable: true
+
+    ReporteCombate:
+      type: object
+      required: [participants, winner, played_at]
+      properties:
+        participants:
+          description: |
+            Exactly two user ids. En formularios web también se acepta la forma
+            de cadena `"3,7"`.
+          oneOf:
+            - type: array
+              minItems: 2
+              maxItems: 2
+              items:
+                type: integer
+            - type: string
+              example: "3,7"
+        winner:
+          type: integer
+          description: Id del ganador declarado; debe ser uno de los participantes.
+        played_at:
+          type: string
+          format: date-time
+          description: ISO-8601; no puede estar en el futuro.
+        referee_id:
+          type: integer
+          description: Opcional. Debe ser un usuario con rol de árbitro de la misma comunidad.
+        client_request_id:
+          type: string
+          maxLength: 64
+          description: Clave de idempotencia generada en el cliente antes de enviar (RF5).
+
+    Confirmacion:
+      type: object
+      required: [winner_id]
+      properties:
+        winner_id:
+          type: integer
+          description: Ganador declarado por quien confirma.
+
+    EdicionCombate:
+      type: object
+      description: Al menos un campo; si no cambia nada y el combate ya está RESUELTO responde 400.
+      minProperties: 1
+      properties:
+        winner_id:
+          type: integer
+        played_at:
+          type: string
+          format: date-time
+        referee_id:
+          type: integer
+          nullable: true
+
+    Auditoria:
+      type: object
+      required: [id, combat_id, admin_id, admin_name, campo, valor_anterior, valor_nuevo, created_at]
+      properties:
+        id:
+          type: integer
+        combat_id:
+          type: integer
+        admin_id:
+          type: integer
+        admin_name:
+          type: string
+          nullable: true
+        campo:
+          type: string
+          description: Campo modificado (p. ej. `winner_id`, `played_at`, `status`).
+        valor_anterior:
+          type: string
+          nullable: true
+        valor_nuevo:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    Recalculo:
+      type: object
+      required: [community_id, combats_processed]
+      properties:
+        community_id:
+          type: integer
+        combats_processed:
+          type: integer
+          description: Nº de combates reprocesados.
+
+    Historial:
+      type: object
+      required: [page, per_page, total, rating, items]
+      properties:
+        page:
+          type: integer
+        per_page:
+          type: integer
+        total:
+          type: integer
+        rating:
+          type: object
+          nullable: true
+          description: Índice actual del usuario, o `null` si nunca jugó.
+          properties:
+            points:
+              type: number
+            matches_played:
+              type: integer
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/HistorialItem"
+
+    HistorialItem:
+      type: object
+      required: [combat_id, played_at, status, winner_id, opponent, result, rating]
+      properties:
+        combat_id:
+          type: integer
+        played_at:
+          type: string
+          format: date-time
+        status:
+          $ref: "#/components/schemas/EstadoCombate"
+        winner_id:
+          type: integer
+          nullable: true
+        opponent:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+        result:
+          allOf:
+            - $ref: "#/components/schemas/ResultadoParticipante"
+          nullable: true
+        rating:
+          type: object
+          nullable: true
+          description: Variación Elo de ese combate, o `null` si no está procesado.
+          properties:
+            points_before:
+              type: number
+            points_after:
+              type: number
+            delta:
+              type: number
+              description: points_after − points_before.
+            matches_played:
+              type: integer
+            k:
+              type: number
+            percentil:
+              type: number
+              description: Percentil del jugador ANTES del duelo (100 = líder).
+
+    Ranking:
+      type: object
+      required: [community_id, page, per_page, total, items]
+      properties:
+        community_id:
+          type: integer
+        page:
+          type: integer
+        per_page:
+          type: integer
+        total:
+          type: integer
+          description: Nº total de jugadores con índice.
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/RankingItem"
+
+    RankingItem:
+      type: object
+      required: [position, name, points, matches_played]
+      properties:
+        position:
+          type: integer
+          description: Posición global (no se reinicia en cada página).
+        name:
+          type: string
+        points:
+          type: number
+          description: Índice Elo con un decimal en la vista.
+        matches_played:
+          type: integer
