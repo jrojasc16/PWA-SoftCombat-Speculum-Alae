@@ -51,6 +51,11 @@ tags:
   - name: Ranking
     description: Ranking público cacheado (RNF002/RNF004) y recálculo manual.
 
+# Toda la API exige la cookie de sesión salvo los endpoints públicos, que la
+# anulan con `security: []` en su propia operación.
+security:
+  - sesionCookie: []
+
 paths:
   /health:
     get:
