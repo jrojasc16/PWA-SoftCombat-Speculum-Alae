@@ -90,6 +90,11 @@ Un archivo o test concreto: `../venv/bin/python -m pytest tests/test_e2e.py -q`.
 | `SECRET_KEY` | **obligatoria en producción** | si falta, la app no arranca (`RuntimeError`). |
 | `DATABASE_URL` | opcional | URL SQLAlchemy; por defecto SQLite en `instance/app.db`. |
 
+Las variables pueden vivir en el archivo opcional **`prototype/.env`** (no
+versionado; lo cargan `wsgi.py` y `run.py` con `python-dotenv` antes de crear
+la app, sin pisar el entorno real). Es la forma recomendada en el despliegue
+de producción — ver [`../documentation/DEPLOY_PYTHONANYWHERE.md`](../documentation/DEPLOY_PYTHONANYWHERE.md).
+
 ## 6. Semilla de datos de prueba (opcional)
 
 Pobla la BD de desarrollo con usuarios y combates confirmados (para probar
