@@ -155,6 +155,14 @@ def test_sw_precachea_app_shell(client):
     assert '"/static/css/estilos.css"' in sw
 
 
+def test_sw_no_cachea_paginas_con_datos_de_sesion_en_navegar(client):
+    """Al navegar solo se guarda el app-shell; /historial y /reportar no."""
+    sw = client.get("/static/sw.js").get_data(as_text=True)
+    assert "APP_SHELL.includes(url.pathname)" in sw
+    # La página personal /historial jamás entra en la caché de navegación.
+    assert '"/historial"' not in sw.split("APP_SHELL =")[1].split("]")[0]
+
+
 # ---------------------------------------------------------------------------
 # Service worker: runtime cache stale-while-revalidate con marca de tiempo
 # ---------------------------------------------------------------------------
@@ -204,7 +212,10 @@ def test_layout_incluye_aviso_offline_y_marca_de_datos(client):
 
 def test_js_comun_registra_el_sw_y_gestiona_el_estado_de_red(client):
     js = client.get("/static/js/app.js").get_data(as_text=True)
-    assert 'register("/static/sw.js")' in js
+    # Scope raíz: sin él el SW solo controlaría /static/ y la PWA offline
+    # no funcionaría (el header Service-Worker-Allowed solo lo permite).
+    assert 'register("/static/sw.js"' in js
+    assert 'scope: "/"' in js
     assert 'addEventListener("online"' in js
     assert 'addEventListener("offline"' in js
     assert "X-SW-Cache-Time" in js

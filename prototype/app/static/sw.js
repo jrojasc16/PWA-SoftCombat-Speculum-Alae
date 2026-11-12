@@ -83,12 +83,16 @@ self.addEventListener("fetch", (evento) => {
     return;
   }
 
-  // Navegaciones y estáticos: red primero, caché de respaldo.
+  // Navegaciones y estáticos: red primero, caché de respaldo. Solo el
+  // app-shell se guarda al navegar: las páginas con datos de sesión
+  // (/historial, /reportar, …) jamás se cachean, igual que sus APIs.
   if (peticion.mode === "navigate" || url.pathname.startsWith("/static/")) {
+    const esNavegacion = peticion.mode === "navigate";
+    const guardable = !esNavegacion || APP_SHELL.includes(url.pathname);
     evento.respondWith(
       fetch(peticion)
         .then((respuesta) => {
-          if (respuesta.ok) {
+          if (respuesta.ok && guardable) {
             const copia = respuesta.clone();
             caches.open(CACHE_LECTURA).then((cache) => cache.put(peticion, copia));
           }

@@ -64,7 +64,10 @@
       [
         { titulo: "Pos.", valor: (fila) => escapar(fila.position) },
         { titulo: "Jugador", valor: (fila) => escapar(fila.name) },
-        { titulo: "Puntos", valor: (fila) => escapar(fila.points) },
+        {
+          titulo: "Puntos",
+          valor: (fila) => escapar(Number(fila.points).toFixed(1)),
+        },
         {
           titulo: "Combates",
           valor: (fila) => escapar(fila.matches_played),
@@ -96,11 +99,12 @@
           valor: (fila) =>
             fila.rating
               ? escapar(
-                  fila.rating.points_before +
+                  Number(fila.rating.points_before).toFixed(1) +
                     " → " +
-                    fila.rating.points_after +
+                    Number(fila.rating.points_after).toFixed(1) +
                     " (" +
-                    fila.rating.delta +
+                    (fila.rating.delta >= 0 ? "+" : "") +
+                    Number(fila.rating.delta).toFixed(1) +
                     ")"
                 )
               : "sin procesar",

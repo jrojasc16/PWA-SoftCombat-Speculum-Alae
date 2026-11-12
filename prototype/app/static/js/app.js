@@ -96,7 +96,7 @@
     }
     window.addEventListener("load", () => {
       navigator.serviceWorker
-        .register("/static/sw.js")
+        .register("/static/sw.js", { scope: "/" })
         .then((registroNuevo) => {
           registro = registroNuevo;
           registroNuevo.addEventListener("updatefound", () => {
