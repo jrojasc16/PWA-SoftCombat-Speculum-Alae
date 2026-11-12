@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Figura 12 — Pantalla principal del usuario (mockup)</title>
+    <link rel="stylesheet" href="../../prototype/app/static/css/estilos.css" />
+    <style>
+      .resumen {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.75rem;
+        margin: 0.75rem 0;
+      }
+      .dato {
+        border: 1px solid var(--color-borde);
+        border-radius: var(--radio);
+        background: var(--color-fondo);
+        padding: 0.85rem 0.5rem;
+        text-align: center;
+      }
+      .dato strong {
+        display: block;
+        font-size: 1.6rem;
+      }
+      .dato span {
+        font-size: 0.85rem;
+        color: var(--color-texto-suave);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="aviso-offline" class="aviso-offline aviso-offline--sin-red" role="status">
+      Sin conexión — copia guardada de las 14:32
+    </div>
+
+    <header class="cabecera">
+      <a class="marca" href="#">Speculum-Alae</a>
+
+      <input
+        type="checkbox"
+        id="nav-toggle"
+        class="nav-toggle-oculto"
+        aria-hidden="true"
+      />
+      <label for="nav-toggle" class="nav-toggle" aria-label="Abrir menú">
+        <span></span><span></span><span></span>
+      </label>
+
+      <nav class="navegacion" aria-label="Principal">
+        <a href="#">Ranking</a>
+        <a href="#">Reportar</a>
+        <a href="#">Pendientes</a>
+        <a href="#">Historial</a>
+        <span class="nav-usuario">Carla Jugadora</span>
+        <a class="boton-secundario" href="#">Salir</a>
+      </nav>
+    </header>
+
+    <main class="contenido">
+      <h1>Hola, Carla</h1>
+
+      <section class="tarjeta">
+        <h2>Tu resumen</h2>
+        <div class="resumen">
+          <div class="dato">
+            <strong>1504.6</strong>
+            <span>Índice Elo</span>
+          </div>
+          <div class="dato">
+            <strong>5.ª</strong>
+            <span>Posición</span>
+          </div>
+          <div class="dato">
+            <strong>4</strong>
+            <span>Combates</span>
+          </div>
+        </div>
+        <p class="ayuda">
+          Tu índice se actualiza en el momento en que un combate queda cerrado.
+        </p>
+      </section>
+
+      <section class="tarjeta">
+        <h2>Accesos rápidos</h2>
+        <div class="acciones">
+          <a class="boton" href="#">Reportar combate</a>
+          <a class="boton-secundario" href="#">Ranking</a>
+          <a class="boton-secundario" href="#">Mi historial</a>
+          <a class="boton-secundario" href="#">Confirmaciones pendientes</a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="pie">
+      <p>Comunidad SoftCombat Speculum-Alae — ranking Elo (reglamento Art. 30).</p>
+    </footer>
+  </body>
+</html>

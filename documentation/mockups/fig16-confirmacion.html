@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Figura 16 — Pantalla de confirmación (mockup)</title>
+    <link rel="stylesheet" href="../../prototype/app/static/css/estilos.css" />
+    <style>
+      .datos-reporte {
+        margin: 0.5rem 0;
+        font-size: 0.95rem;
+      }
+      .datos-reporte dt {
+        font-weight: 600;
+        display: inline;
+      }
+      .datos-reporte dd {
+        display: inline;
+        margin: 0 0 0 0.35rem;
+      }
+      .datos-reporte div {
+        margin-bottom: 0.25rem;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="cabecera">
+      <a class="marca" href="#">Speculum-Alae</a>
+
+      <input
+        type="checkbox"
+        id="nav-toggle"
+        class="nav-toggle-oculto"
+        aria-hidden="true"
+      />
+      <label for="nav-toggle" class="nav-toggle" aria-label="Abrir menú">
+        <span></span><span></span><span></span>
+      </label>
+
+      <nav class="navegacion" aria-label="Principal">
+        <a href="#">Ranking</a>
+        <a href="#">Reportar</a>
+        <a href="#">Pendientes</a>
+        <a href="#">Historial</a>
+        <span class="nav-usuario">Carla Jugadora</span>
+        <a class="boton-secundario" href="#">Salir</a>
+      </nav>
+    </header>
+
+    <main class="contenido">
+      <h1>Confirmaciones pendientes</h1>
+      <p class="ayuda">
+        Combates en los que apareces como participante o como árbitro y que aún
+        no están cerrados. Elige el ganador real: si ambos coinciden, el combate
+        se confirma y el ranking se actualiza.
+      </p>
+
+      <div class="tarjeta">
+        <h2>Luis Rival vs. Carla Jugadora — 11/11/2026 19:00</h2>
+        <dl class="datos-reporte">
+          <div><dt>Reportado por:</dt> <dd>Luis Rival (bando A)</dd></div>
+          <div><dt>Resultado reportado:</dt> <dd>Ganó Luis Rival (2–1)</dd></div>
+          <div><dt>Árbitro:</dt> <dd>Arturo Árbitro (opcional)</dd></div>
+        </dl>
+        <div class="acciones">
+          <button type="button" class="boton">Confirmar</button>
+          <button type="button" class="boton-secundario">Reportar discrepancia</button>
+        </div>
+      </div>
+
+      <div class="tarjeta">
+        <h2>Carla Jugadora vs. Marta Contrincante — 10/11/2026 17:45</h2>
+        <p class="mensaje mensaje-ok" role="status">
+          Eres el <strong>árbitro</strong> de este combate: tu confirmación
+          prevalece sobre las de los jugadores.
+        </p>
+        <dl class="datos-reporte">
+          <div><dt>Reportado por:</dt> <dd>Marta Contrincante (bando B)</dd></div>
+          <div><dt>Resultado reportado:</dt> <dd>Ganó Marta Contrincante (1–2)</dd></div>
+        </dl>
+        <div class="acciones">
+          <button type="button" class="boton">Confirmar (prioridad de árbitro)</button>
+          <button type="button" class="boton-secundario">Reportar discrepancia</button>
+        </div>
+      </div>
+    </main>
+
+    <footer class="pie">
+      <p>Comunidad SoftCombat Speculum-Alae — ranking Elo (reglamento Art. 30).</p>
+    </footer>
+  </body>
+</html>

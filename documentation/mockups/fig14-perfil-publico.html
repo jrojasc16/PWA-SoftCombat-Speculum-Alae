@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Figura 14 — Perfil público de otro jugador (mockup)</title>
+    <link rel="stylesheet" href="../../prototype/app/static/css/estilos.css" />
+    <style>
+      .resumen {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.75rem;
+        margin: 0.75rem 0;
+      }
+      .dato {
+        border: 1px solid var(--color-borde);
+        border-radius: var(--radio);
+        background: var(--color-fondo);
+        padding: 0.85rem 0.5rem;
+        text-align: center;
+      }
+      .dato strong {
+        display: block;
+        font-size: 1.6rem;
+      }
+      .dato span {
+        font-size: 0.85rem;
+        color: var(--color-texto-suave);
+      }
+    </style>
+  </head>
+  <body>
+    <header class="cabecera">
+      <a class="marca" href="#">Speculum-Alae</a>
+
+      <input
+        type="checkbox"
+        id="nav-toggle"
+        class="nav-toggle-oculto"
+        aria-hidden="true"
+      />
+      <label for="nav-toggle" class="nav-toggle" aria-label="Abrir menú">
+        <span></span><span></span><span></span>
+      </label>
+
+      <nav class="navegacion" aria-label="Principal">
+        <a href="#">Ranking</a>
+        <a href="#">Iniciar sesión</a>
+        <a class="boton" href="#">Registrarse</a>
+      </nav>
+    </header>
+
+    <main class="contenido">
+      <h1>Luis Rival</h1>
+
+      <section class="tarjeta">
+        <h2>Perfil público</h2>
+        <div class="resumen">
+          <div class="dato">
+            <strong>4.º</strong>
+            <span>Posición</span>
+          </div>
+          <div class="dato">
+            <strong>1509.0</strong>
+            <span>Índice Elo</span>
+          </div>
+          <div class="dato">
+            <strong>4</strong>
+            <span>Combates</span>
+          </div>
+        </div>
+        <p class="ayuda">
+          Misma proyección del DTO público (<code>GET /api/ranking</code>): solo
+          datos del ranking, sin correos ni datos de cuenta.
+        </p>
+      </section>
+
+      <section class="tarjeta">
+        <h2>Historial reciente</h2>
+        <div class="tabla-envoltura">
+          <table class="tabla">
+            <thead>
+              <tr>
+                <th scope="col">Fecha</th>
+                <th scope="col">Resultado</th>
+                <th scope="col">Rival</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>12/10/2026</td>
+                <td>Victoria 2–0</td>
+                <td>Sara Hoja</td>
+              </tr>
+              <tr>
+                <td>28/09/2026</td>
+                <td>Derrota 1–2</td>
+                <td>Carla Jugadora</td>
+              </tr>
+              <tr>
+                <td>14/09/2026</td>
+                <td>Victoria 2–1</td>
+                <td>Nico Duelista</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <footer class="pie">
+      <p>Comunidad SoftCombat Speculum-Alae — ranking Elo (reglamento Art. 30).</p>
+    </footer>
+  </body>
+</html>

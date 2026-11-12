@@ -58,7 +58,7 @@ package "extensions" {
 
 package "tests (pytest)" as tests
 package "wordpress-integration" {
-  [plugin PHP\nshortcode [ranking_table]] as wp_plugin
+  [plugin PHP\nshortcode ranking_table] as wp_plugin
 }
 
 iam_services --> iam_repos

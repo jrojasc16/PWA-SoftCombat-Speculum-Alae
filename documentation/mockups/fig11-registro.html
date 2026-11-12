@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Figura 11 — Registro de jugadores (mockup)</title>
+    <link rel="stylesheet" href="../../prototype/app/static/css/estilos.css" />
+    <style>
+      .validacion-ok {
+        color: var(--color-ok);
+        font-size: 0.85rem;
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="cabecera">
+      <a class="marca" href="#">Speculum-Alae</a>
+
+      <input
+        type="checkbox"
+        id="nav-toggle"
+        class="nav-toggle-oculto"
+        aria-hidden="true"
+      />
+      <label for="nav-toggle" class="nav-toggle" aria-label="Abrir menú">
+        <span></span><span></span><span></span>
+      </label>
+
+      <nav class="navegacion" aria-label="Principal">
+        <a href="#">Ranking</a>
+        <a href="#">Iniciar sesión</a>
+        <a class="boton" href="#">Registrarse</a>
+      </nav>
+    </header>
+
+    <main class="contenido">
+      <section class="tarjeta tarjeta-estrecha">
+        <h1>Crear cuenta</h1>
+        <p class="ayuda">
+          Te registras como <strong>jugador</strong> de la comunidad. En un solo
+          paso quedas dentro y ya puedes reportar tus combates.
+        </p>
+
+        <form class="formulario">
+          <label for="name">Nombre de usuario (único)</label>
+          <input
+            type="text"
+            id="name"
+            name="name"
+            required
+            minlength="2"
+            autocomplete="username"
+            value="carlag"
+          />
+          <p class="validacion-ok">✓ «carlag» está disponible</p>
+
+          <label for="email">Correo electrónico</label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            required
+            autocomplete="email"
+            value="carla@correo.com"
+          />
+          <p class="validacion-ok">✓ Correo válido</p>
+
+          <label for="password">Contraseña (mínimo 6 caracteres)</label>
+          <input
+            type="password"
+            id="password"
+            name="password"
+            required
+            minlength="6"
+            autocomplete="new-password"
+            value="••••••••"
+          />
+          <p class="validacion-ok">✓ 8 caracteres (mínimo 6)</p>
+
+          <label for="password2">Confirmar contraseña</label>
+          <input
+            type="password"
+            id="password2"
+            name="password2"
+            required
+            autocomplete="new-password"
+            value="••••••••"
+          />
+          <p class="validacion-ok">✓ Las contraseñas coinciden</p>
+
+          <button type="submit" class="boton">Crear cuenta</button>
+        </form>
+
+        <p class="enlace-secundario">
+          ¿Ya tienes cuenta?
+          <a href="#">Inicia sesión</a>.
+        </p>
+      </section>
+    </main>
+
+    <footer class="pie">
+      <p>Comunidad SoftCombat Speculum-Alae — ranking Elo (reglamento Art. 30).</p>
+    </footer>
+  </body>
+</html>

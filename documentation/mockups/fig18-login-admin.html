@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Figura 18 — Login del panel administrador (mockup)</title>
+    <link rel="stylesheet" href="../../prototype/app/static/css/estilos.css" />
+  </head>
+  <body>
+    <header class="cabecera">
+      <a class="marca" href="#">Speculum-Alae</a>
+
+      <input
+        type="checkbox"
+        id="nav-toggle"
+        class="nav-toggle-oculto"
+        aria-hidden="true"
+      />
+      <label for="nav-toggle" class="nav-toggle" aria-label="Abrir menú">
+        <span></span><span></span><span></span>
+      </label>
+
+      <nav class="navegacion" aria-label="Principal">
+        <a href="#">← Volver a la PWA</a>
+        <a href="#">Ranking</a>
+      </nav>
+    </header>
+
+    <main class="contenido">
+      <section class="tarjeta tarjeta-estrecha">
+        <h1>Panel de administración</h1>
+        <p class="ayuda">
+          Acceso restringido a los roles <strong>admin</strong> y
+          <strong>super_admin</strong> de la comunidad.
+        </p>
+
+        <p class="mensaje mensaje-error" role="alert">
+          403 — Tu cuenta no tiene el rol de administrador.
+        </p>
+
+        <form class="formulario">
+          <label for="email">Correo electrónico</label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            autocomplete="email"
+            value="ana@correo.com"
+          />
+
+          <label for="password">Contraseña</label>
+          <input
+            type="password"
+            id="password"
+            name="password"
+            autocomplete="current-password"
+          />
+
+          <button type="submit" class="boton">Entrar</button>
+        </form>
+
+        <p class="enlace-secundario">
+          ¿No tienes permisos de administrador?
+          <a href="#">Regresar a la PWA</a>.
+        </p>
+      </section>
+    </main>
+
+    <footer class="pie">
+      <p>Comunidad SoftCombat Speculum-Alae — ranking Elo (reglamento Art. 30).</p>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Figura 13 — Ranking propio (mockup)</title>
+    <link rel="stylesheet" href="../../prototype/app/static/css/estilos.css" />
+    <style>
+      .tabla tbody tr.fila-propia {
+        background: #f7eeff;
+        box-shadow: inset 4px 0 0 var(--color-acento);
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="aviso-offline" class="aviso-offline aviso-offline--sin-red" role="status">
+      Sin conexión — copia guardada de las 14:32
+    </div>
+
+    <header class="cabecera">
+      <a class="marca" href="#">Speculum-Alae</a>
+
+      <input
+        type="checkbox"
+        id="nav-toggle"
+        class="nav-toggle-oculto"
+        aria-hidden="true"
+      />
+      <label for="nav-toggle" class="nav-toggle" aria-label="Abrir menú">
+        <span></span><span></span><span></span>
+      </label>
+
+      <nav class="navegacion" aria-label="Principal">
+        <a href="#">Ranking</a>
+        <a href="#">Reportar</a>
+        <a href="#">Pendientes</a>
+        <a href="#">Historial</a>
+        <span class="nav-usuario">Carla Jugadora</span>
+        <a class="boton-secundario" href="#">Salir</a>
+      </nav>
+    </header>
+
+    <main class="contenido">
+      <h1>Ranking de la comunidad</h1>
+
+      <p id="marca-datos" class="marca-datos">Datos de las 14:32</p>
+
+      <p class="ayuda">
+        Consulta pública y cacheada (mismos datos que la API). Tu fila aparece
+        resaltada.
+      </p>
+
+      <div class="tarjeta">
+        <div class="tabla-envoltura">
+          <table class="tabla">
+            <caption class="vacio" style="text-align: left; padding: 0 0 0.5rem">
+              7 jugadores con índice
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Pos.</th>
+                <th scope="col">Jugador</th>
+                <th scope="col">Puntos</th>
+                <th scope="col">Combates</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>1</td>
+                <td>Diego Espada</td>
+                <td>1523.7</td>
+                <td>6</td>
+              </tr>
+              <tr>
+                <td>2</td>
+                <td>Marta Contrincante</td>
+                <td>1518.2</td>
+                <td>5</td>
+              </tr>
+              <tr>
+                <td>3</td>
+                <td>Luna Castigo</td>
+                <td>1511.4</td>
+                <td>4</td>
+              </tr>
+              <tr>
+                <td>4</td>
+                <td>Luis Rival</td>
+                <td>1509.0</td>
+                <td>4</td>
+              </tr>
+              <tr class="fila-propia">
+                <td>5</td>
+                <td>Carla Jugadora (tú)</td>
+                <td>1504.6</td>
+                <td>4</td>
+              </tr>
+              <tr>
+                <td>6</td>
+                <td>Nico Duelista</td>
+                <td>1497.2</td>
+                <td>4</td>
+              </tr>
+              <tr>
+                <td>7</td>
+                <td>Sara Hoja</td>
+                <td>1490.5</td>
+                <td>2</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <nav class="paginacion" aria-label="Paginación del ranking">
+          <span></span>
+          <span>Página 1 de 1</span>
+          <span></span>
+        </nav>
+      </div>
+    </main>
+
+    <footer class="pie">
+      <p>Comunidad SoftCombat Speculum-Alae — ranking Elo (reglamento Art. 30).</p>
+    </footer>
+  </body>
+</html>

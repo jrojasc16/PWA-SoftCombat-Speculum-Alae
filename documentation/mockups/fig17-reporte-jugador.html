@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Figura 17 — Reporte de combate como jugador (mockup)</title>
+    <link rel="stylesheet" href="../../prototype/app/static/css/estilos.css" />
+  </head>
+  <body>
+    <header class="cabecera">
+      <a class="marca" href="#">Speculum-Alae</a>
+
+      <input
+        type="checkbox"
+        id="nav-toggle"
+        class="nav-toggle-oculto"
+        aria-hidden="true"
+      />
+      <label for="nav-toggle" class="nav-toggle" aria-label="Abrir menú">
+        <span></span><span></span><span></span>
+      </label>
+
+      <nav class="navegacion" aria-label="Principal">
+        <a href="#">Ranking</a>
+        <a href="#">Reportar</a>
+        <a href="#">Pendientes</a>
+        <a href="#">Historial</a>
+        <span class="nav-usuario">Carla Jugadora</span>
+        <a class="boton-secundario" href="#">Salir</a>
+      </nav>
+    </header>
+
+    <main class="contenido">
+      <h1>Reportar combate</h1>
+      <p class="mensaje" role="status">
+        Al enviarlo, el combate quedará <strong>PENDIENTE</strong> hasta que el
+        otro bando o un árbitro lo confirmen.
+      </p>
+
+      <div class="tarjeta">
+        <form class="formulario">
+          <label for="jugado">Fecha y hora del combate</label>
+          <input type="datetime-local" id="jugado" name="jugado" value="2026-11-12T19:00" />
+
+          <label for="modalidad">Modalidad</label>
+          <select id="modalidad" name="modalidad">
+            <option selected>Individual</option>
+            <option>Grupal</option>
+          </select>
+
+          <label for="bando-a">Bando A — participantes</label>
+          <input type="text" id="bando-a" name="bando-a" value="Carla Jugadora" />
+
+          <label for="bando-b">Bando B — participantes</label>
+          <input type="text" id="bando-b" name="bando-b" value="Nico Duelista" />
+
+          <label for="puntaje-a">Puntaje del bando A (zonas ganadas)</label>
+          <input type="number" id="puntaje-a" name="puntaje-a" min="0" value="2" />
+
+          <label for="puntaje-b">Puntaje del bando B (zonas ganadas)</label>
+          <input type="number" id="puntaje-b" name="puntaje-b" min="0" value="1" />
+
+          <label for="arbitro">Árbitro asignado (opcional)</label>
+          <select id="arbitro" name="arbitro">
+            <option selected>Sin árbitro</option>
+            <option>Arturo Árbitro</option>
+          </select>
+
+          <button type="submit" class="boton">Enviar reporte</button>
+        </form>
+      </div>
+    </main>
+
+    <footer class="pie">
+      <p>Comunidad SoftCombat Speculum-Alae — ranking Elo (reglamento Art. 30).</p>
+    </footer>
+  </body>
+</html>
