@@ -13,6 +13,8 @@ mapa ``config_by_name``.
 import os
 from pathlib import Path
 
+from flask import redirect, request
+
 # Directorio instance/ (BD SQLite por entorno); queda fuera del versionado.
 INSTANCE_DIR = Path(__file__).resolve().parent.parent / "instance"
 
@@ -64,10 +66,30 @@ class ProductionConfig(Config):
     @classmethod
     def init_app(cls, app):
         # Falla explícita si falta la clave secreta real en producción.
-        if not os.environ.get("SECRET_KEY"):
+        clave = os.environ.get("SECRET_KEY")
+        if not clave:
             raise RuntimeError(
                 "SECRET_KEY no definida: es obligatoria en producción (variable de entorno)."
             )
+        # Se fija aquí (y no al importar el módulo) para que el valor del
+        # entorno sea el que aplique aunque config.py ya se haya importado.
+        app.config["SECRET_KEY"] = clave
+
+        # RNF001: HTTPS forzado (capa 1 de 3, ver REVISION_SEGURIDAD.md).
+        # Solo redirige con evidencia POSITIVA de HTTP vía el proxy
+        # (cabecera X-Forwarded-Proto: http), así no puede haber bucle:
+        # tras la redirección el navegador entra por https y la cabecera
+        # desaparece o dice "https". 308 preserva método y cuerpo (importa
+        # para los POST de la cola offline); si la cabecera no existe
+        # (plataforma sin proxy), no redirige — ese caso lo cubre el
+        # toggle «Force HTTPS» de PythonAnywhere (despliegue, tarea 13.2).
+        @app.before_request
+        def _forzar_https_tras_proxy():
+            if (
+                request.headers.get("X-Forwarded-Proto") == "http"
+                and request.url.startswith("http://")
+            ):
+                return redirect(request.url.replace("http://", "https://", 1), code=308)
 
 
 config_by_name = {
