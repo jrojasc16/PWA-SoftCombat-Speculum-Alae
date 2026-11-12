@@ -81,8 +81,11 @@ def ranking_publico(community_id: int, page: int, per_page: int) -> dict:
         entrada = _CACHE.get(clave)
         if entrada is not None and entrada[1] > ahora:
             return entrada[0]
-
-    payload = _consultar(community_id, page, per_page)
-    with _LOCK:
+        # Single-flight: la consulta se ejecuta bajo el lock para que una
+        # ráfaga concurrente tras una invalidación dispare UNA sola consulta
+        # (el resto espera y luego sirve desde la caché). Sin esto, 100
+        # peticiones en frío ejecutan 100 queries y el p95 se dispara
+        # (RNF002: <500 ms con 100 usuarios).
+        payload = _consultar(community_id, page, per_page)
         _CACHE[clave] = (payload, ahora + ttl)
-    return payload
+        return payload
