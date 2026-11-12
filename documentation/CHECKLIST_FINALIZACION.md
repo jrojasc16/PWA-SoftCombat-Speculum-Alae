@@ -1,6 +1,6 @@
 # Checklist de finalización del proyecto — Speculum-Alae Ranking App
 
-**Fecha de corte:** 2026-11-09 · **Rama de trabajo:** `desarrollo-sprint-7` · **Plan maestro:** `documentation/PLAN_DESARROLLO_PROTOTIPO.md`
+**Fecha de corte:** 2026-11-11 · **Rama de trabajo:** `desarrollo-sprint-7` · **Plan maestro:** `documentation/PLAN_DESARROLLO_PROTOTIPO.md`
 
 ---
 
@@ -8,12 +8,12 @@
 
 | Ítem | Estado |
 |---|---|
-| Sprints 1–8 | Completados y marcados en el plan |
+| Sprints 1–12 | Completados y marcados en el plan (excepción: Sprint 11 al 50 % — 11.1–11.3 hechos, 11.4–11.5 pendientes); **Sprint 13 en curso** (13.1 hecho) |
 | Sprint 8 | **Completado** (commits `6a1c2ad`, `92b371e`, `48fcd60`, `580b7ff`, `2d10c3a`): manifest + iconos, SW stale-while-revalidate con marca de tiempo, indicador offline, verificador de instalabilidad, pruebas manuales documentadas. La ejecución con navegador real (instalación y modo avión) queda pendiente para el equipo |
 | Sprint 9 | **Completado** (commits `8d4d758`, `e71ea3e`, `0d5240f`, `fe71eed`, `86feffe` + `a850eb7`): cola `outbox` en IndexedDB, drenaje FIFO con backoff, idempotencia `client_request_id`, lista de pendientes en `/reportar`, diagramas actualizados. Verificado en Microsoft Edge headless (9 pasos OK) |
 | Working tree | Limpio salvo este documento de trabajo (`documentation/CHECKLIST_FINALIZACION.md`) |
-| Push al remoto | **Pendiente** — la rama `desarrollo-sprint-7` no existe en `origin` (42 commits locales) |
-| Entregables "stub" | `prototype/docs/openapi.yaml` (1 línea), `prototype/wordpress-plugin/ranking-table.php` (5 líneas), `prototype/app/static/db.js` (6 líneas) |
+| Push al remoto | **Pendiente** — la rama `desarrollo-sprint-7` no existe en `origin` (62 commits locales) |
+| Entregables "stub" | Superados: `prototype/docs/openapi.yaml` completo y validado (12.1–12.2), `prototype/wordpress-plugin/ranking-table.php` completo (11.1–11.3), `prototype/app/static/db.js` completa (9.1) |
 | Diagramas | Fuentes `.puml`/`.mmd` existentes, **sin PNG exportados** (requerido por 18 espacios reservados del `.docx` v2) |
 | Documentación | `.docx` v2 redactado; faltan las figuras PNG |
 | Código | Todo vive en `prototype/`; `code/` sigue reservado (vacío) |
@@ -84,17 +84,17 @@ Comando de verificación local: `cd prototype && ../venv/bin/python -m pytest -q
 - [x] **12.1** Completar `prototype/docs/openapi.yaml` (hoy es una línea de docstring) con **todos** los endpoints: auth, combates, confirmaciones, ranking público, admin, historial; esquemas y códigos de error. — commit `c1d19bc` (OpenAPI 3.0.3: 18 paths, 20 operaciones JSON, 25 esquemas; respuestas compartidas 400/401/403/404/409 → esquema `Error`; seguridad `sesionCookie` con `security: []` en los públicos).
 - [x] **12.2** Validar el OpenAPI (linter/validador) y referenciarlo en el README. — commit `d758a40` (`openapi-spec-validator` + `PyYAML` en `prototype/requirements.txt`; 17 tests en `tests/test_openapi.py` con el validador oficial + cross-checks contra `url_map` de Flask, enums, límites de `shared/http.py`, códigos de error y seguridad; sección «API REST (OpenAPI)» en el README).
 - [x] **12.3** Suite de integración end-to-end: registro → reporte → confirmación dual → ranking actualizado → historial → endpoint público. — commit `9a1c06a` (`tests/test_e2e.py`, 3 tests: flujo completo con idempotencia y códigos 409/400 de confirmación, conflicto resuelto por admin con bitácora y recálculo estable, 401 JSON sin redirección en 10 endpoints; `conftest.py` limpia `g._login_user` por petición para que cada cliente de pruebas vea su propia sesión).
-- [ ] **12.4** Script de semilla de datos: 100 usuarios + N combates confirmados.
-- [ ] **12.5** Prueba de carga sobre `GET /api/ranking` (`locust`/`ab`): **p95 < 500 ms con 100 usuarios** (RNF002) y documentar resultados.
-- [ ] **12.6** Revisión de seguridad: bcrypt costo 12 efectivo, cookies `Secure`/`HttpOnly`, HTTPS forzado en producción, sin datos sensibles en respuestas públicas.
-- [ ] **12.7** Confirmar cobertura Elo ≥ 70 % (hoy 100 %) con `scripts/check.sh` y artefactos de CI.
-- **Verificación parcial:** `scripts/check.sh` en verde (**403 tests**, cobertura `app.modules.ranking` = 100 %); spec validado por `openapi-spec-validator` en la suite (17 tests) y suite e2e de 3 tests en verde. **Estado: 12.1–12.3 completados (3 de 7).**
+- [x] **12.4** Script de semilla de datos: 100 usuarios + N combates confirmados. — commit `8c586db` (`scripts/semillar_datos.py`: `--usuarios`, `--combates`, `--reset`, `--seed`, `--database-url`; reporta y cierra con los servicios reales y round-robin inicial para que los 100 entren al ranking; verificado: 100 usuarios, 100 ratings, 200 combates `CONFIRMADO`).
+- [x] **12.5** Prueba de carga sobre `GET /api/ranking` (`locust`/`ab`): **p95 < 500 ms con 100 usuarios** (RNF002) y documentar resultados. — commit `92eef76` (herramienta propia stdlib `scripts/cargar_api_ranking.py` porque locust/ab no están en el entorno; informe `documentation/CARGA_API_RANKING.md`: **p95 = 156.8 ms con caché → CUMPLE** y **p95 = 246.6 ms en estampida → CUMPLE** tras un fix *single-flight* en `public_api/services.py`; sin caché p95 ≈ 8 000 ms, documentado como no desplegable).
+- [x] **12.6** Revisión de seguridad: bcrypt costo 12 efectivo, cookies `Secure`/`HttpOnly`, HTTPS forzado en producción, sin datos sensibles en respuestas públicas. — commit `f70770f` (informe `documentation/REVISION_SEGURIDAD.md` con los 4 puntos ✅ + 9 tests en `tests/test_seguridad.py`: hash real `$2b$12$`, `Set-Cookie` con `HttpOnly`/`SameSite=Lax`, `Secure`+`SECRET_KEY`+debug off en producción, redirección 308 loop-safe tras el proxy y toggle «Force HTTPS» de PythonAnywhere para 13.2, contratos cerrados en `/health`, `/api/ranking` y `/me/community`).
+- [x] **12.7** Confirmar cobertura Elo ≥ 70 % (hoy 100 %) con `scripts/check.sh` y artefactos de CI. — verificado sin cambios de código: `scripts/check.sh` → «Required test coverage of 70% reached. Total coverage: 100.00%» (**412 tests**) y «Chequeo OK.»; artefactos `coverage.xml`/`pytest-junit.xml` → `reporte-cobertura-ranking` confirmados en `.github/workflows/ci.yml` (desde el Sprint 3.6).
+- **Verificación final:** `scripts/check.sh` en verde (**412 tests**, cobertura `app.modules.ranking` = 100 % ≥ 70 %); spec validado (17 tests), suite e2e (3 tests), informe de carga con RNF002 CUMPLE y revisión de seguridad con los 4 puntos cumplidos. **Estado: SPRINT 12 COMPLETADO (7 de 7 tareas).**
 
 ---
 
 ## Sprint 13 — Documentación técnica y de usuario
 
-- [ ] **13.1** `prototype/README.md`: instalar, migrar (`flask db upgrade`), correr (`run.py`/`wsgi.py`), testear — en español.
+- [x] **13.1** `prototype/README.md`: instalar, migrar (`flask db upgrade`), correr (`run.py`/`wsgi.py`), testear — en español. — commit `8f7b593` (README con las 4 secciones pedidas: instalar —venv + `requirements.txt`, con nota de Python 3.14—, migrar —`flask --app run.py db upgrade` verificado y con la advertencia de no usar `wsgi.py` localmente—, correr —`run.py` + smoke `GET /health` respondido 200—, testear —`pytest -q` desde `prototype/` y `scripts/check.sh`—; más variables de entorno, semilla de datos, estructura y notas de la PWA).
 - [ ] **13.2** Guía de despliegue en PythonAnywhere: variables de entorno, `SECRET_KEY`, `wsgi.py`, dominio y HTTPS.
 - [ ] **13.3** Manual de usuario breve por rol (jugador, árbitro, admin) con capturas de pantalla.
 - [ ] **13.4** **Exportar los PNG de `documentation/diagrams/`** (hoy no existe ninguno) e insertarlos en los **18 espacios reservados** del `.docx` v2 (`documentation/Metodologia_Proyecto_Ingenieria_Software_Speculum_Alae_v2_PWA.docx`), revisando coherencia figura ↔ texto.
