@@ -4,10 +4,11 @@ classDiagram
 namespace modules_iam {
     class User {
         +int id
-        +int community_id
-        +str username
         +str email
         +str password_hash
+        +str name
+        +int role_id
+        +int community_id
         +bool active
         +datetime created_at
     }
@@ -17,11 +18,13 @@ namespace modules_iam {
         +JSON permissions
     }
     class AuthService {
-        +register(username, email, password)
-        +authenticate(username, password)
-        +change_password(user, new_password)
+        +register_user(email, password, name, community_id)
+        +authenticate(email, password)
+        +cambiar_estado_usuario(admin_id, user_id, activo)
+        +cambiar_rol_usuario(admin_id, user_id, rol)
     }
     class UserRepository
+    class RoleRepository
 }
 
 namespace modules_combat {
@@ -29,104 +32,127 @@ namespace modules_combat {
         <<aggregate root>>
         +int id
         +int community_id
-        +date date
-        +enum modality
-        +str event_type
+        +int reporter_id
         +int referee_id
         +enum status
+        +datetime played_at
+        +str client_request_id
         +bool processed
-        +int created_by
+        +datetime created_at
     }
     class CombatParticipant {
         +int id
-        +str side
-        +int score
+        +int combat_id
+        +int user_id
         +enum result
+        +int community_id
     }
     class Confirmation {
         +int id
+        +int combat_id
+        +int user_id
         +JSON reported_result
+        +int community_id
         +datetime created_at
     }
     class AuditLog {
         +int id
+        +int combat_id
         +int admin_id
-        +JSON old_value
-        +JSON new_value
+        +str campo
+        +str valor_anterior
+        +str valor_nuevo
+        +int community_id
         +datetime created_at
     }
     class CombatService {
-        +register_combat(dto)
-        +confirm(combat, by_user)
-        +resolve_conflict_by_referee(combat)
-        +admin_edit_result(combat, new_result, admin)
+        +report_combat(reporter_id, community_id, participants, played_at)
+        +confirm_combat(user_id, combat_id, result)
+        +admin_edit_result(admin_id, combat_id, nuevos_datos)
+        +listar_combates_admin(community_id, estado)
+        +auditoria_de_combate(combat_id, admin_id)
     }
     class CombatRepository
+    class ConfirmationRepository
+    class AuditLogRepository
 }
 
 namespace modules_ranking {
     class EloCalculator {
         <<domain service puro>>
-        +k_for(num_combats, percentile) float
-        +expected(ra, rb) float
-        +new_rating(r, score, expected, k) float
+        +expected_score(rating_a, rating_b) float
+        +t_factor(combates) float
+        +x_factor(percentil) float
+        +k_factor(combates, percentil) float
+        +new_ratings() DueloResultado
+        +resolver_duelo() DueloResultado
     }
     class Rating {
+        +int id
         +int user_id
         +int community_id
-        +float elo
-        +int num_combats
-        +int position
+        +float points
+        +int matches_played
         +datetime updated_at
     }
     class RatingHistory {
-        +int user_id
+        +int id
         +int combat_id
-        +float elo_before
-        +float elo_after
+        +int user_id
+        +int community_id
+        +float points_before
+        +float points_after
+        +int matches_played
+        +float k
+        +float percentil
         +datetime created_at
     }
     class RankingService {
-        +recalculate_on_confirm(combat)
-        +recalculate_all(community_id)
+        +process_confirmed_combat(combat_id)
+        +recalculate_full(community_id)
     }
     class RatingRepository
+    class RatingHistoryRepository
 }
 
 namespace modules_history {
     class HistoryService {
-        +history_for(user_id, filters, page) Page
+        +historial_de_usuario(user_id, community_id, page, per_page)
     }
-    class HistoryRepository
+    class HistorialRepository
 }
 
 namespace modules_public_api {
     class RankingEntryDTO {
         +int position
-        +str username
-        +float elo
-        +int num_combats
+        +str name
+        +float points
+        +int matches_played
     }
     class PublicRankingService {
-        +get_ranking(community_id) List~RankingEntryDTO~
+        +ranking_publico(community_id, page, per_page) List~RankingEntryDTO~
     }
 }
 
 User "N" --> "1" Role
 Combat "1" *-- "N" CombatParticipant
 Combat "1" *-- "N" Confirmation
+Combat "1" *-- "N" AuditLog
 CombatParticipant "N" --> "1" User
 Confirmation "N" --> "1" User
-Combat --> User : referee opcional
-AuditLog --> Combat
+Combat --> User : reporter / referee opcional
 Rating --> User
 RatingHistory --> User
 RatingHistory --> Combat
 
 CombatService ..> CombatRepository
+CombatService ..> ConfirmationRepository
+CombatService ..> AuditLogRepository
 CombatService ..> RankingService : notifica confirmación
 RankingService ..> EloCalculator
 RankingService ..> RatingRepository
-HistoryService ..> HistoryRepository
+RankingService ..> RatingHistoryRepository
+HistoryService ..> HistorialRepository
 PublicRankingService ..> RatingRepository
 AuthService ..> UserRepository
+AuthService ..> RoleRepository

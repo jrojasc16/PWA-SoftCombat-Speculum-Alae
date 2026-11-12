@@ -5,10 +5,11 @@ title Diagrama de clases — Monolito modular Flask (MVP)
 package "modules.iam" {
   class User {
     +id: int
-    +community_id: int
-    +username: str (único)
     +email: str (único)
     +password_hash: str (bcrypt costo 12)
+    +name: str
+    +role_id: int
+    +community_id: int
     +active: bool
     +created_at: datetime
   }
@@ -18,57 +19,72 @@ package "modules.iam" {
     +permissions: JSON  ' preparado para roles dinámicos
   }
   class AuthService {
-    +register(username, email, password)
-    +authenticate(username, password)
-    +change_password(user, new_password)
+    +register_user(email, password, name, community_id)
+    +authenticate(email, password)
+    +cambiar_estado_usuario(admin_id, user_id, activo)
+    +cambiar_rol_usuario(admin_id, user_id, rol)
   }
   class UserRepository
+  class RoleRepository
 }
 
 package "modules.combat" {
   class Combat <<aggregate root>> {
     +id: int
     +community_id: int
-    +date: date
-    +modality: enum  ' individual | grupal
-    +event_type: str ' solo grupal
-    +referee_id: int (opcional)
+    +reporter_id: int
+    +referee_id: int (nullable)
     +status: enum  ' PENDIENTE | CONFIRMADO | CONFLICTO | RESUELTO
-    +processed: bool ' idempotencia Elo
-    +created_by: int
+    +played_at: datetime
+    +client_request_id: str  ' idempotencia del reporte (offline)
+    +processed: bool  ' idempotencia Elo
+    +created_at: datetime
   }
   class CombatParticipant {
     +id: int
-    +side: str        ' bando / equipo
-    +score: int       ' individual: 1 o 2 por zonas
-    +result: enum     ' victoria | derrota (grupal)
+    +combat_id: int
+    +user_id: int
+    +result: enum  ' VICTORIA | DERROTA
+    +community_id: int
   }
   class Confirmation {
     +id: int
-    +reported_result: JSON
+    +combat_id: int
+    +user_id: int
+    +reported_result: JSON  ' {"winner_id": n}
+    +community_id: int
     +created_at: datetime
   }
   class AuditLog {
     +id: int
+    +combat_id: int
     +admin_id: int
-    +old_value: JSON
-    +new_value: JSON
+    +campo: str
+    +valor_anterior: str (nullable)
+    +valor_nuevo: str (nullable)
+    +community_id: int
     +created_at: datetime
   }
   class CombatService {
-    +register_combat(dto)
-    +confirm(combat, by_user)
-    +resolve_conflict_by_referee(combat)
-    +admin_edit_result(combat, new_result, admin)  ' escribe AuditLog
+    +report_combat(reporter_id, community_id, participants, played_at, ...)
+    +confirm_combat(user_id, combat_id, result)
+    +admin_edit_result(admin_id, combat_id, nuevos_datos)  ' escribe AuditLog
+    +listar_combates_admin(community_id, estado)
+    +auditoria_de_combate(combat_id, admin_id)
   }
   class CombatRepository
+  class ConfirmationRepository
+  class AuditLogRepository
 }
 
 package "modules.ranking" {
   class EloCalculator <<domain service, puro>> {
-    +k_for(num_combats: int, percentile: float): float
-    +expected(ra: float, rb: float): float
-    +new_rating(r: float, score: float, expected: float, k: float): float
+    +expected_score(rating_a, rating_b): float
+    +t_factor(combates): float
+    +x_factor(percentil): float
+    +k_factor(combates, percentil): float
+    +new_ratings(...): DueloResultado
+    +resolver_duelo(...): DueloResultado
   }
   note right of EloCalculator
     Sin dependencias externas (ni Flask ni SQLAlchemy).
@@ -77,63 +93,73 @@ package "modules.ranking" {
     Cobertura de tests >= 70%.
   end note
   class Rating {
+    +id: int
     +user_id: int
     +community_id: int
-    +elo: float
-    +num_combats: int
-    +position: int
+    +points: float
+    +matches_played: int
     +updated_at: datetime
   }
   class RatingHistory {
-    +user_id: int
+    +id: int
     +combat_id: int
-    +elo_before: float
-    +elo_after: float
+    +user_id: int
+    +community_id: int
+    +points_before: float
+    +points_after: float
+    +matches_played: int
+    +k: float
+    +percentil: float
     +created_at: datetime
   }
   class RankingService {
-    +recalculate_on_confirm(combat)  ' misma transacción que la confirmación
-    +recalculate_all(community_id)  ' botón admin; reconstruye desde historial
+    +process_confirmed_combat(combat_id)  ' misma transacción que la confirmación
+    +recalculate_full(community_id)  ' botón admin; reconstruye desde historial
   }
   class RatingRepository
+  class RatingHistoryRepository
 }
 
 package "modules.history" {
   class HistoryService {
-    +history_for(user_id, filters, page): Page
+    +historial_de_usuario(user_id, community_id, page, per_page)
   }
-  class HistoryRepository
+  class HistorialRepository
 }
 
 package "modules.public_api" {
   class RankingEntryDTO {
     +position: int
-    +username: str
-    +elo: float
-    +num_combats: int
+    +name: str
+    +points: float
+    +matches_played: int
   }
   class PublicRankingService {
-    +get_ranking(community_id): List<RankingEntryDTO>  ' caché en memoria, TTL
+    +ranking_publico(community_id, page, per_page)  ' caché en memoria, TTL
   }
 }
 
 User "N" --> "1" Role
 Combat "1" *-- "N" CombatParticipant
 Combat "1" *-- "N" Confirmation
+Combat "1" *-- "N" AuditLog
 CombatParticipant "N" --> "1" User
 Confirmation "N" --> "1" User
-Combat --> User : referee (opcional)
-AuditLog --> Combat
+Combat --> User : reporter / referee (opcional)
 Rating --> User
 RatingHistory --> User
 RatingHistory --> Combat
 
 CombatService ..> CombatRepository
+CombatService ..> ConfirmationRepository
+CombatService ..> AuditLogRepository
 CombatService ..> RankingService : notifica confirmación
 RankingService ..> EloCalculator
 RankingService ..> RatingRepository
-HistoryService ..> HistoryRepository
+RankingService ..> RatingHistoryRepository
+HistoryService ..> HistorialRepository
 PublicRankingService ..> RatingRepository
 AuthService ..> UserRepository
+AuthService ..> RoleRepository
 
 @enduml
