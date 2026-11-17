@@ -24,11 +24,11 @@ Comando de verificación local: `cd prototype && ../venv/bin/python -m pytest -q
 
 ## Bloque 0 — Cierres administrativos inmediatos (antes de seguir)
 
-- [ ] **0.1** ~~Commitear el trabajo parcial del Sprint 8~~ — **hecho** (commits `6a1c2ad` … `2d10c3a`).
-- [ ] **0.2** Ejecutar `git push -u origin desarrollo-sprint-7` (lo ejecuta el usuario con sus credenciales; este entorno no tiene acceso a GitHub).
-- [ ] **0.3** Verificar con `git status -sb` que la rama queda siguiendo el remoto y sin cambios pendientes.
+- [x] **0.1** ~~Commitear el trabajo parcial del Sprint 8~~ — **hecho** (commits `6a1c2ad` … `2d10c3a`).
+- [x] **0.2** Ejecutar `git push -u origin desarrollo-sprint-7` (lo ejecuta el usuario con sus credenciales; este entorno no tiene acceso a GitHub).
+- [x] **0.3** Verificar con `git status -sb` que la rama queda siguiendo el remoto y sin cambios pendientes.
 - [ ] **0.4** Decidir el destino de `code/` (vacío): eliminarlo o dejar constancia en el README de que el código vive en `prototype/`.
-- [ ] **0.5** Confirmar con el supervisor la transición de stack aprobada (Flask + SQLite + PWA) antes del cierre del Sprint 14, ya que el `.docx` v1.0 sigue siendo la referencia histórica.
+- [x] **0.5** Confirmar con el supervisor la transición de stack aprobada (Flask + SQLite + PWA) antes del cierre del Sprint 14, ya que el `.docx` v1.0 sigue siendo la referencia histórica.
 
 ---
 
